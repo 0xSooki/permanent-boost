@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 
 [project]
-name = "scikit_build_example"
+name = "sooki"
 version = "0.0.1"
 description = "Permanent calculator package (with pybind11)"
 readme = "README.md"

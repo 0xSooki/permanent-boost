@@ -1,4 +1,6 @@
-from scikit_build_example import permanent
+from __future__ import annotations
+
+from sooki import permanent
 import numpy as np
 
 
