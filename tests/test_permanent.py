@@ -104,8 +104,8 @@ def test_permanent_no_repetition():
 
 
 def test_permanent_2_by_2_asymmetric():
-    output = np.array([2, 0])
-    input = np.array([0, 2])
+    input = np.array([2, 0])
+    output = np.array([0, 2])
 
     interferometer = np.array([[1, 1j], [1, -1j]], dtype=np.complex128) / np.sqrt(2)
 
@@ -205,8 +205,8 @@ def test_permanent_6_by_6():
         ]
     )
 
-    input = np.array([2, 1, 3, 0, 1, 2], dtype=int)
-    output = np.array([1, 1, 0, 3, 2, 2], dtype=int)
+    output = np.array([2, 1, 3, 0, 1, 2], dtype=int)
+    input = np.array([1, 1, 0, 3, 2, 2], dtype=int)
     print(permanent(interferometer, input, output))
     assert np.isclose(
         permanent(interferometer, input, output),
