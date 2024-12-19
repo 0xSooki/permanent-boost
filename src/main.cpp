@@ -11,14 +11,14 @@ namespace py = pybind11;
 
 template <typename T>
 T permanent_np(py::array_t<T, py::array::c_style | py::array::forcecast> array,
-               py::array_t<int> cols, py::array_t<int> rows) {
+               py::array_t<int> rows, py::array_t<int> cols) {
   Matrix<T> matrix = numpy_to_matrix(array);
 
   std::vector<int> row_mult = numpy_to_vec(rows);
   std::vector<int> col_mult = numpy_to_vec(cols);
 
   T result =
-      permanent<std::complex<double>, double>(matrix, col_mult, row_mult);
+      permanent<std::complex<double>, double>(matrix, row_mult, col_mult);
 
   return result;
 }
