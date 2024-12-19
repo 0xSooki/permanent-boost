@@ -205,6 +205,10 @@ public:
 
   void set_offset_max(const int64_t &value) { offset_max = value; }
 
+  int64_t get_offset_max() { return offset_max; }
+
+  int64_t get_offset() { return offset; }
+
 }; // n_aryGrayCodeCounter
 
 #endif
