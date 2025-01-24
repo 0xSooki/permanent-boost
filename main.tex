@@ -1,0 +1,102 @@
+\documentclass[a4paper]{article}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage[english]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{amsfonts}
+\usepackage[colorinlistoftodos]{todonotes}
+
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}[section]
+\newtheorem*{remark}{Remark}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{corollary}{Corollary}[theorem]
+
+\newtheorem{lemma}{Lemma}[section]
+
+\title{Thesis}
+
+\author{Bence Sooki-Toth}
+
+\date{\today}
+\begin{document}
+\maketitle
+
+\begin{abstract}
+  \centering
+  Efficient calculation of permanent function gradients in photonic quantum computing
+  simulations
+\end{abstract}
+
+Quantum computers were first conceptualized in a lecture given by Richard Feynman on the potential advantages of computing with quantum systems. Since then, quantum computers have been at the frontier of research due to their potential capability of executing computations that would not be feasible on classical computers. \\
+
+Among the various quantum computing paradigms recently photonic seems to have grabbed the attention of scientists with its outstanding capabilities such as observing quantum phenomena at room temperature. With the advancements of photonic quantum computers, the demand for simulators has risen as well, despite not being able to do certain circuit optimization tasks. However such simulators still open up the possibility of running quantum programs on classical hardware. Simulation of photonic systems can be computationally demanding, hence the underlying algorithms must be developed to run efficiently. \\
+
+Photonic quantum computing, which uses qumodes instead of qubits, presents unique computational challenges, particularly in the classical simulation of photonic quantum computing, and has important applications in quantum circuit design, most notably in optimizing nondeterministic quantum gates. A common operation in these simulations is the calculation of matrix permanents, which is computationally intensive but essential for modeling quantum interference. This thesis focuses on developing a scalable and parallelized Python package, implemented in C++. It uses state-of-the-art methods to efficiently calculate matrix permanents and their derivatives, enabling gradient-based methods like backpropagation in quantum machine learning (QML). The proposed package aims to improve both the speed and usability of permanent computations, facilitating more accessible photonic quantum simulations. \\
+
+\pagebreak
+
+\section{intro}
+
+Original formula
+
+\[
+  \operatorname{perm}(\boldsymbol{A}, \boldsymbol{M}, \boldsymbol{N}) = \frac{1}{2^{n-1}} \sum_{\boldsymbol{\Delta}} \left( \prod_{k=1}^{\#modes } (-1)^{\Delta_{k}} \binom{M_{k}}{\Delta_{k}} \right) \prod_{j=1}^{\# modes } \left( \sum_{k=1}^{\# modes} \left( M_{k} - 2 \Delta_{k} \right) a_{k, j} \right)^{N_{j}}
+\]
+
+Derivative with respect to $a_{xy}$
+
+\[
+  \frac{\partial}{\partial a_{xy}}perm(A, M, N) =
+\]
+\[
+  \frac{1}{2^{n-1}}\sum_{\Delta}\left(\prod_{k=1}^{\#modes}(-1)^{\Delta_{k}}\binom{M_{k}}{\Delta_{k}}\right)\frac{\partial}{\partial a_{xy}}\prod_{j=1}^{\#modes}\left(\sum_{k=1}^{\#modes}(M_{k}-2\Delta_{k})a_{kj}\right)^{N_{j}}
+\]
+
+It only effects terms containing $a_xy$
+
+\[
+  \prod_{j=1}^{\#modes}\left(\sum_{k=1}^{\#modes}\left(M_{k}-2 \Delta_{k}\right) a_{k, j}\right)^{N_{j}}
+\]
+
+Based on this derivating the summands
+
+\[
+  \frac{\partial}{\partial a_{xy}} \left( \sum_{k=1}^{\#modes } \left( M_{k} - 2 \Delta_{k} \right) a_{k, y} \right)^{N_{y}} = N_{y} \left( \sum_{k=1}^{\#modes} \left( M_{k} - 2 \Delta_{k} \right) a_{k, y} \right)^{N_{y} - 1} (M_{x} - 2 \Delta_{x})
+\]
+
+The derivative of the entire formula
+
+\[
+  \frac{\partial}{\partial a_{xy}} \operatorname{perm}(\boldsymbol{A}, \boldsymbol{M}, \boldsymbol{N}) = \frac{1}{2^{n-1}} \sum_{\boldsymbol{\Delta}} \left( \prod_{k=1}^{\# { modes }} (-1)^{\Delta_{k}} \binom{M_{k}}{\Delta_{k}} \right) \left( \prod_{\substack{j=1 \\ j \neq y}}^{\# { modes }} \left( \sum_{k=1}^{\# { modes }} \left( M_{k} - 2 \Delta_{k} \right) a_{k, j} \right)^{N_{j}} \right)
+\]
+\[
+  \times N_{y} \left( \sum_{k=1}^{\# { modes }} \left( M_{k} - 2 \Delta_{k} \right) a_{k, y} \right)^{N_{y} - 1} (M_{x} - 2 \Delta_{x})
+\]
+
+How it affects the matrix
+
+\[
+  \frac{\partial}{\partial a_{xy}}\underset{\vec{M},\vec{N}}{perm}(A)=
+  \stackrel{\mbox{$N_1$ \hspace{14mm}$N_{y}$ \hspace{15mm} $N_{n}$}}{%
+    \begin{bmatrix}
+      a_{11} a_{11} & \dots  & a_{1y}a_{1y} & \dots  & a_{1n} \\
+      a_{11} a_{11} & \dots  & a_{1y}a_{1y} & \dots  & a_{1n} \\
+      \vdots        & \ddots & \vdots       & \ddots & \vdots \\
+      a_{x1} a_{x1} & \dots  & a_{xy}a_{xy} & \dots  & a_{xn} \\
+      a_{x1} a_{x1} & \dots  & a_{xy}a_{xy} & \dots  & a_{xn} \\
+      \vdots        & \ddots & \vdots       & \ddots & \vdots \\
+      a_{n1} a_{n1} & \dots  & a_{ny}a_{ny} & \dots  & a_{nn} \\
+      a_{n1} a_{n1} & \dots  & a_{ny}a_{ny} & \dots  & a_{nn} \\
+    \end{bmatrix}%
+  }
+  \begin{tabular}{ccc}
+    $M_1 \vspace{10mm}$ & \\ \vspace{10mm}
+    $M_x$               & \\
+    $M_{n}$
+  \end{tabular}
+\]
+
+
+\end{document}
