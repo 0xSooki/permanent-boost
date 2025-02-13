@@ -1,5 +1,5 @@
 [build-system]
-requires = ["scikit-build-core>=0.3.3", "pybind11"]
+requires = ["scikit-build-core>=0.3.3", "pybind11", "jax>=0.4.31"]
 build-backend = "scikit_build_core.build"
 
 
@@ -10,6 +10,7 @@ description = "Permanent calculator package (with pybind11)"
 readme = "README.md"
 authors = [{ name = "sooki", email = "0xSooki@protonmail.com" }]
 requires-python = ">=3.7"
+dependencies = ["jax"]
 classifiers = [
   "Development Status :: 4 - Beta",
   "License :: OSI Approved :: MIT License",
