@@ -1,21 +1,18 @@
-import numpy as jnp
-
-import pytest
-
-from assym import assym_reduce
 from permanent import perm
+import numpy as np
+from assym import assym_reduce
 
 
 def test_permanent_trivial_case():
-    matrix = jnp.array([[4.2]], dtype=jnp.complex128)
+    matrix = np.array([[4.2]], dtype=np.complex128)
 
-    input = output = jnp.ones(1, dtype=jnp.uint64)
+    input = output = np.ones(1, dtype=np.uint64)
 
-    assert jnp.isclose(perm(matrix, input, output), 4.2)
+    assert np.isclose(perm(matrix, input, output), 4.2)
 
 
 def test_permanent_zero_input():
-    interferometer = jnp.array(
+    interferometer = np.array(
         [
             [
                 0.62270314 + 0.55117657j,
@@ -32,16 +29,16 @@ def test_permanent_zero_input():
                 -0.45222962 - 0.75121057j,
                 0.06995606 - 0.3540245j,
             ],
-        ], dtype=jnp.complex128
+        ], dtype=np.complex128
     )
 
-    input = output = jnp.zeros(3, dtype=jnp.uint64)
+    input = output = np.zeros(3, dtype=np.uint64)
 
-    assert jnp.isclose(perm(interferometer, input, output), 1.0)
+    assert np.isclose(perm(interferometer, input, output), 1.0)
 
 
 def test_permanent_no_repetition():
-    interferometer = jnp.array(
+    interferometer = np.array(
         [
             [
                 0.62113733 - 0.01959968j,
@@ -91,28 +88,27 @@ def test_permanent_no_repetition():
                 0.28736069 - 0.00798998j,
                 -0.13763068 - 0.09058005j,
             ],
-        ], dtype=jnp.complex128
+        ], dtype=np.complex128
     )
 
-    input = output = jnp.ones(6, dtype=jnp.uint64)
+    input = output = np.ones(6, dtype=np.uint64)
 
-    assert jnp.isclose(
+    assert np.isclose(
         perm(interferometer, input, output),
         0.022227325527358795 + 0.01807052573717885j,
     )
 
 
 def test_permanent_2_by_2_asymmetric():
-    input = jnp.array([2, 0])
-    output = jnp.array([0, 2])
+    input = np.array([2, 0], dtype=np.uint64)
+    output = np.array([0, 2], dtype=np.uint64)
 
-    interferometer = jnp.array([[1, 1j], [1, -1j]], dtype=jnp.complex128) / jnp.sqrt(2)
-
-    assert jnp.isclose(perm(interferometer, input, output), -1)
+    interferometer = np.array([[1, 1j], [1, -1j]], dtype=np.complex128) / np.sqrt(2)
+    assert np.isclose(perm(interferometer, input, output), -1)
 
 
 def test_permanent_4_by_4():
-    unitary = jnp.array(
+    unitary = np.array(
         [
             [
                 0.50142122 - 0.15131566j,
@@ -139,20 +135,20 @@ def test_permanent_4_by_4():
                 -0.78447544 + 0.11350836j,
             ],
         ],
-        dtype=jnp.complex128
+        dtype=np.complex128
     )
 
-    rows = jnp.array([3, 0, 0, 1], dtype=jnp.uint64)
-    cols = jnp.array([0, 0, 3, 1], dtype=jnp.uint64)
+    rows = np.array([3, 0, 0, 1], dtype=np.uint64)
+    cols = np.array([0, 0, 3, 1], dtype=np.uint64)
     print(perm(unitary, rows, cols))
-    assert jnp.isclose(
+    assert np.isclose(
         perm(unitary, rows, cols),
         0.4302957973670928 + 0.3986355418194044j,
     )
 
 
 def test_permanent_6_by_6():
-    interferometer = jnp.array(
+    interferometer = np.array(
         [
             [
                 0.00456448 - 0.37857979j,
@@ -203,33 +199,33 @@ def test_permanent_6_by_6():
                 -0.06188047 + 0.14647274j,
             ],
         ],
-        dtype=jnp.complex128
+        dtype=np.complex128
     )
 
-    output = jnp.array([2, 1, 3, 0, 1, 2], dtype=jnp.uint64)
-    input = jnp.array([1, 1, 0, 3, 2, 2], dtype=jnp.uint64)
+    output = np.array([2, 1, 3, 0, 1, 2], dtype=np.uint64)
+    input = np.array([1, 1, 0, 3, 2, 2], dtype=np.uint64)
     print(perm(interferometer, input, output))
-    assert jnp.isclose(
+    assert np.isclose(
         perm(interferometer, input, output),
         0.13160241373727416 + 0.36535625772184577j,
     )
 
 
 def test_permanent_asymmetric_matrix():
-    unitary = jnp.array(
+    unitary = np.array(
         [
             [0.909394 + 0.264435j, 0.00450261 + 0.0188079j, 0.316704 + 0.0490014j],
             [-0.109435 - 0.117915j, 0.35198 + 0.812257j, 0.312276 + 0.304881j],
         ],
-        dtype=jnp.complex128,
+        dtype=np.complex128,
     )
+    rows = np.array([2, 1], dtype=np.uint64)
+    cols = np.array([1, 1, 1], dtype=np.uint64)
 
-    rows = jnp.array([2, 1], dtype=jnp.uint64)
-    cols = jnp.array([1, 1, 1], dtype=jnp.uint64)
+    ones = np.ones(3, dtype=np.uint64)
 
-    ones = jnp.ones(sum(rows), dtype=jnp.uint64)
-
-    assert jnp.isclose(
+    assert np.isclose(
         perm(unitary, rows, cols),
-        perm(assym_reduce(unitary, rows, cols), ones, ones),
+        perm(assym_reduce(unitary, rows.astype(dtype=int),
+             cols.astype(dtype=int)), ones, ones),
     )
