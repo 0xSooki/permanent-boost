@@ -40,19 +40,20 @@ std::pair<int64_t, int64_t> get_dims(const ffi::Buffer<T> &buffer) {
   return std::make_pair(buffer.element_count(), dims.back());
 }
 
-ffi::Error PermanentImpl(ffi::Buffer<ffi::C128> x, ffi::Buffer<ffi::U64> rows,
+ffi::Error PermanentImpl(ffi::Buffer<ffi::C128> A, ffi::Buffer<ffi::U64> rows,
                          ffi::Buffer<ffi::U64> cols,
                          ffi::ResultBuffer<ffi::C128> y) {
-  auto [totalSize, n] = get_dims(x);
+  auto [total_size, n] = get_dims(A);
 
   if (n == 0) {
-    return ffi::Error::InvalidArgument("RmsNorm input must be an array");
+    return ffi::Error::InvalidArgument("Perm input must be a matrix");
   }
   std::vector<int> row_mult(&(rows.typed_data()[0]),
-                            &(rows.typed_data()[0]) + n);
+                            &(rows.typed_data()[0]) + total_size / n);
   std::vector<int> col_mult(&(cols.typed_data()[0]),
                             &(cols.typed_data()[0]) + n);
-  Matrix<std::complex<double>> matrix(n, n, &(x.typed_data()[0]));
+
+  Matrix<std::complex<double>> matrix(total_size / n, n, &(A.typed_data()[0]));
 
   y->typed_data()[0] =
       permanent<std::complex<double>, double>(matrix, row_mult, col_mult);
