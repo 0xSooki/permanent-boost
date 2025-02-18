@@ -45,6 +45,7 @@ Original formula
   \operatorname{perm}(\boldsymbol{A}, \boldsymbol{M}, \boldsymbol{N}) = \frac{1}{2^{n-1}} \sum_{\boldsymbol{\Delta}} \left( \prod_{k=1}^{\#modes } (-1)^{\Delta_{k}} \binom{M_{k}}{\Delta_{k}} \right) \prod_{j=1}^{\# modes } \left( \sum_{k=1}^{\# modes} \left( M_{k} - 2 \Delta_{k} \right) a_{k, j} \right)^{N_{j}}
 \]
 
+\noindent
 Derivative with respect to $a_{xy}$
 
 \[
@@ -54,18 +55,21 @@ Derivative with respect to $a_{xy}$
   \frac{1}{2^{n-1}}\sum_{\Delta}\left(\prod_{k=1}^{\#modes}(-1)^{\Delta_{k}}\binom{M_{k}}{\Delta_{k}}\right)\frac{\partial}{\partial a_{xy}}\prod_{j=1}^{\#modes}\left(\sum_{k=1}^{\#modes}(M_{k}-2\Delta_{k})a_{kj}\right)^{N_{j}}
 \]
 
+\noindent
 It only effects terms containing $a_xy$
 
 \[
   \prod_{j=1}^{\#modes}\left(\sum_{k=1}^{\#modes}\left(M_{k}-2 \Delta_{k}\right) a_{k, j}\right)^{N_{j}}
 \]
 
-Based on this derivating the summands
+\noindent
+Based on this, derivating the summands
 
 \[
   \frac{\partial}{\partial a_{xy}} \left( \sum_{k=1}^{\#modes } \left( M_{k} - 2 \Delta_{k} \right) a_{k, y} \right)^{N_{y}} = N_{y} \left( \sum_{k=1}^{\#modes} \left( M_{k} - 2 \Delta_{k} \right) a_{k, y} \right)^{N_{y} - 1} (M_{x} - 2 \Delta_{x})
 \]
 
+\noindent
 The derivative of the entire formula
 
 \[
@@ -75,6 +79,7 @@ The derivative of the entire formula
   \times N_{y} \left( \sum_{k=1}^{\# { modes }} \left( M_{k} - 2 \Delta_{k} \right) a_{k, y} \right)^{N_{y} - 1} (M_{x} - 2 \Delta_{x})
 \]
 
+\noindent
 How it affects the matrix
 
 \[
