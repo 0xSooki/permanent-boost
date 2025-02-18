@@ -19,13 +19,13 @@
  * expansion by minors.
  *
  * @tparam T The type of the elements in the matrix.
- * @param mtx The input matrix for which the permanent is to be computed.
+ * @param A The input matrix for which the permanent is to be computed.
  * @param rows A vector representing the multiplicity of each row.
  * @param cols A vector representing the multiplicity of each column.
  * @return The permanent of the input matrix.
  */
 template <typename scalar_type, typename precision_type>
-std::complex<double> permanent(Matrix<std::complex<double>> &mtx,
+std::complex<double> permanent(Matrix<std::complex<double>> &A,
                                std::vector<int> &rows, std::vector<int> &cols) {
 
   size_t min_idx = 0;
@@ -48,20 +48,20 @@ std::complex<double> permanent(Matrix<std::complex<double>> &mtx,
     }
     rows_[1 + min_idx] -= 1;
 
-    Matrix<scalar_type> mtx_(mtx.rows + 1, mtx.cols);
+    Matrix<scalar_type> mtx_(A.rows + 1, A.cols);
 
-    for (int j = 0; j < mtx.cols; j++) {
-      mtx_(0, j) = mtx(min_idx, j);
+    for (int j = 0; j < A.cols; j++) {
+      mtx_(0, j) = A(min_idx, j);
     }
 
-    for (int i = 0; i < mtx.rows; i++) {
-      for (int j = 0; j < mtx.cols; j++) {
-        mtx_(i + 1, j) = mtx(i, j);
+    for (int i = 0; i < A.rows; i++) {
+      for (int j = 0; j < A.cols; j++) {
+        mtx_(i + 1, j) = A(i, j);
       }
     }
 
     rows = rows_;
-    mtx = mtx_;
+    A = mtx_;
   }
 
   int sum_rows = sum(rows);
@@ -73,15 +73,15 @@ std::complex<double> permanent(Matrix<std::complex<double>> &mtx,
     throw error;
   }
 
-  if (mtx.rows == 0 || mtx.cols == 0 || sum_rows == 0 || sum_cols == 0)
+  if (A.rows == 0 || A.cols == 0 || sum_rows == 0 || sum_cols == 0)
     // the permanent of an empty matrix is 1 by definition
     return std::complex<double>(1.0, 0.0);
 
-  if (mtx.rows == 1) {
+  if (A.rows == 1) {
     scalar_type ret(1.0, 0.0);
     for (size_t idx = 0; idx < cols.size(); idx++) {
       for (size_t jdx = 0; jdx < cols[idx]; jdx++) {
-        ret *= mtx[idx];
+        ret *= A[idx];
       }
     }
 
@@ -89,9 +89,9 @@ std::complex<double> permanent(Matrix<std::complex<double>> &mtx,
   }
 
   Matrix<std::complex<double>> mtx2 =
-      Matrix<std::complex<double>>(mtx.rows, mtx.cols);
-  for (size_t idx = 0; idx < mtx.size(); idx++) {
-    mtx2[idx] = mtx[idx] * 2.0;
+      Matrix<std::complex<double>>(A.rows, A.cols);
+  for (size_t idx = 0; idx < A.size(); idx++) {
+    mtx2[idx] = A[idx] * 2.0;
   }
 
   std::vector<int> n_ary_limits(rows.size() - 1);
@@ -138,8 +138,8 @@ std::complex<double> permanent(Matrix<std::complex<double>> &mtx,
   __int128 binomial_coeff = 1;
 
   Matrix<scalar_type> colsum(1, cols.size());
-  std::uninitialized_copy_n(mtx.data, colsum.size(), colsum.data);
-  auto mtx_data = mtx.data + mtx.stride;
+  std::uninitialized_copy_n(A.data, colsum.size(), colsum.data);
+  auto mtx_data = A.data + A.stride;
 
   // variable to count all the -1 elements in the delta vector
   int minus_signs_all = 0;
@@ -154,7 +154,7 @@ std::complex<double> permanent(Matrix<std::complex<double>> &mtx,
     int rows_current = rows[idx + 1];
 
     for (size_t col_idx = 0; col_idx < cols.size(); col_idx++) {
-      colsum[col_idx] += (scalar_type)mtx(row_idx, col_idx) *
+      colsum[col_idx] += (scalar_type)A(row_idx, col_idx) *
                          (precision_type)(rows_current - 2 * minus_signs);
     }
 
@@ -163,7 +163,7 @@ std::complex<double> permanent(Matrix<std::complex<double>> &mtx,
     // update the binomial coefficient
     binomial_coeff *= binomialCoeffInt128(rows_current, minus_signs);
 
-    // mtx_data += mtx.stride;
+    // mtx_data += A.stride;
     row_idx += 1;
   }
 
@@ -194,7 +194,7 @@ std::complex<double> permanent(Matrix<std::complex<double>> &mtx,
     parity = -parity;
 
     // update column sum and calculate the product of the elements
-    int row_offset = (changed_index + 1); //* mtx.stride;
+    int row_offset = (changed_index + 1); //* A.stride;
     // auto mtx_data = mtx2.data + row_offset;
     scalar_type colsum_prod((precision_type)parity, (precision_type)0.0);
 
@@ -234,4 +234,37 @@ std::complex<double> permanent(Matrix<std::complex<double>> &mtx,
   permanent /= std::pow(2, sum_rows - 1);
   return permanent;
 }
+
+Matrix<std::complex<double>> grad_perm(Matrix<std::complex<double>> &A,
+                                       std::vector<int> &rows,
+                                       std::vector<int> &cols) {
+  int n = rows.size();
+
+  Matrix<std::complex<double>> perm_grad(n, n);
+
+  for (int i = 0; i < n; ++i) {
+    if (rows[i] == 0)
+      continue;
+
+    for (int j = 0; j < n; ++j) {
+      if (cols[j] == 0)
+        continue;
+
+      std::vector<int> grad_rows(rows);
+      grad_rows[i] -= 1;
+
+      Matrix<std::complex<double>> A_(A);
+
+      std::vector<int> grad_cols(cols);
+      grad_cols[j] -= 1;
+
+      perm_grad(i, j) =
+          (double)rows[i] * (double)cols[j] *
+          permanent<std::complex<double>, double>(A_, grad_rows, grad_cols);
+    }
+  }
+
+  return perm_grad;
+}
+
 #endif
