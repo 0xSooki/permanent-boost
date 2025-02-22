@@ -11,6 +11,11 @@
 #include "n_aryGrayCodeCounter.hpp"
 #include <thread>
 
+#ifdef __SIZEOF_INT128__ // Check if __int128 is supported
+using int_type = __int128;
+#else
+using int_type = int64_t; // Fallback to int64_t
+#endif
 /**
  * @brief Computes the permanent of a given matrix.
  *
@@ -135,7 +140,7 @@ std::complex<double> permanent(Matrix<std::complex<double>> &A,
   std::vector<int> gcode = gcode_counter.get();
 
   // calculate the initial column sum and binomial coefficient
-  __int128 binomial_coeff = 1;
+  int_type binomial_coeff = 1;
 
   Matrix<scalar_type> colsum(1, cols.size());
   std::uninitialized_copy_n(A.data, colsum.size(), colsum.data);

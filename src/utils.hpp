@@ -4,6 +4,12 @@
 #include <numeric>
 #include <vector>
 
+#ifdef __SIZEOF_INT128__ // Check if __int128 is supported
+using int_type = __int128;
+#else
+using int_type = int64_t; // Fallback to int64_t
+#endif
+
 template <typename int_type> int_type binomialCoeffTemplated(int n, int k) {
   int_type C[k + 1];
   memset(C, 0, sizeof(C));
@@ -15,8 +21,8 @@ template <typename int_type> int_type binomialCoeffTemplated(int n, int k) {
   return C[k];
 }
 
-inline __int128 binomialCoeffInt128(int n, int k) {
-  return binomialCoeffTemplated<__int128>(n, k);
+inline int_type binomialCoeffInt128(int n, int k) {
+  return binomialCoeffTemplated<int_type>(n, k);
 }
 
 template <typename T> int sum(std::vector<T> vec) {
