@@ -71,8 +71,8 @@ jobs:
 
       - name: Install dependencies in virtual environment
         run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
+          venv/bin/python -m pip install --upgrade pip
+          venv/bin/python -m pip install -r requirements.txt
 
       - name: Build and install
         # --no-build-isolation is required because the vanilla setuptool does not
@@ -84,5 +84,5 @@ jobs:
 
       - name: Test
         run: |
-          pip install pytest
+          venv/bin/python -m pip install pytest
           pytest tests/
