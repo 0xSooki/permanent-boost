@@ -70,8 +70,8 @@ jobs:
 
       - name: Install dependencies in virtual environment
         run: |
-          venv/bin/python pip install --upgrade pip
-          venv/bin/python -m pip install -r requirements.txt
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
 
       - name: Build and install
         # --no-build-isolation is required because the vanilla setuptool does not
@@ -79,7 +79,9 @@ jobs:
         # https://github.com/msys2/MINGW-packages/tree/master/mingw-w64-python-setuptools
         # Without those patches build_ext fails with:
         # error: --plat-name must be one of ('win32', 'win-amd64', 'win-arm32', 'win-arm64')
-        run: venv/bin/python - pip install --no-build-isolation .
+        run: python -m pip install --no-build-isolation .
 
       - name: Test
-        run: pytest tests/
+        run: |
+          python -m pip install pytest
+          pytest tests/
