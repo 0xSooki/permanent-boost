@@ -10,9 +10,8 @@ using int_type = __int128;
 using int_type = int64_t; // Fallback to int64_t
 #endif
 
-template <typename int_type> int_type binomialCoeffTemplated(int n, int k) {
-  int_type C[k + 1];
-  memset(C, 0, sizeof(C));
+inline int_type binomialCoeffTemplated(int n, int k) {
+  std::vector<int_type> C(k + 1, 0);
   C[0] = 1;
   for (int i = 1; i <= n; i++) {
     for (int j = std::min(i, k); j > 0; j--)
@@ -22,7 +21,7 @@ template <typename int_type> int_type binomialCoeffTemplated(int n, int k) {
 }
 
 inline int_type binomialCoeffInt128(int n, int k) {
-  return binomialCoeffTemplated<int_type>(n, k);
+  return binomialCoeffTemplated(n, k);
 }
 
 template <typename T> int sum(std::vector<T> vec) {
