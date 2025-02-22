@@ -64,26 +64,21 @@ jobs:
           export SSL_CERT_FILE=$(python -m certifi)
         shell: bash
 
-      - name: Create virtual environment
+      - name: Create and activate virtual environment
         run: |
           python -m venv venv
-          ls -l venv
-        shell: mysys {0}
 
       - name: Install dependencies in virtual environment
         run: |
-          source venv/bin/activate
-          pip install -r requirements.txt
-        shell: bash
+          venv/bin/python -m pip install -r requirements.txt
 
       - name: Build and install
-        run: |
-          source venv/bin/activate
-          pip install --no-build-isolation .
-        shell: bash
+        # --no-build-isolation is required because the vanilla setuptool does not
+        # support Mingw64.See patches here:
+        # https://github.com/msys2/MINGW-packages/tree/master/mingw-w64-python-setuptools
+        # Without those patches build_ext fails with:
+        # error: --plat-name must be one of ('win32', 'win-amd64', 'win-arm32', 'win-arm64')
+        run: venv/bin/python - pip install --no-build-isolation .
 
       - name: Test
-        run: |
-          source venv/bin/activate
-          pytest tests/
-        shell: bash
+        run: pytest tests/
