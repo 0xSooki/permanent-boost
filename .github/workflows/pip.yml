@@ -67,8 +67,8 @@ jobs:
       - name: Create virtual environment
         run: |
           python -m venv venv
-          source venv/bin/activate
-        shell: bash
+          ls -l venv
+        shell: mysys {0}
 
       - name: Install dependencies in virtual environment
         run: |
