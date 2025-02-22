@@ -1,3 +1,3 @@
-jax==0.4.25
-pybind11==2.13.4
-scikit-build-core>=0.3.3
+jax
+pybind11
+scikit-build-core

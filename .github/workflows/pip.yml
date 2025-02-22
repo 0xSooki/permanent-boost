@@ -60,11 +60,9 @@ jobs:
       - name: Create and activate virtual environment
         run: |
           python -m venv venv
-          venv\Scripts\activate
+          venv/Scripts/activate
       - name: Install dependencies in virtual environment
         run: |
-          venv/bin/python -m pip install --upgrade pip
-          venv/bin/python -m pip install --upgrade --find-links https://storage.googleapis.com/jax-releases/jax_releases.html jax jaxlib
           venv/bin/python -m pip install -r requirements.txt
 
       - name: Build and install
