@@ -16,7 +16,16 @@ project(
 find_package(Python REQUIRED COMPONENTS Interpreter Development.Module)
 find_package(pybind11 CONFIG REQUIRED)
 
-# set(Python_EXECUTABLE /opt/anaconda3/envs/piq1/bin/python3.12)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(TBB REQUIRED tbb)
+
+message(STATUS "TBB include directories: ${TBB_INCLUDE_DIRS}")
+message(STATUS "TBB library directories: ${TBB_LIBRARY_DIRS}")
+message(STATUS "TBB libraries: ${TBB_LIBRARIES}")
+include_directories(${TBB_INCLUDE_DIRS})
+link_directories(${TBB_LIBRARY_DIRS})
+
+set(Python_EXECUTABLE /opt/anaconda3/envs/piq1/bin/python3.12)
 execute_process(
   COMMAND "${Python_EXECUTABLE}"
           "-c" "from jax import ffi; print(ffi.include_dir())"
@@ -26,6 +35,7 @@ message(STATUS "XLA include directory: ${XLA_DIR}")
 # Add a library using FindPython's tooling (pybind11 also provides a helper like
 # this)
 python_add_library(_core MODULE src/main.cpp WITH_SOABI)
+target_link_libraries(_core PUBLIC ${TBB_LIBRARIES})
 target_link_libraries(_core PRIVATE pybind11::headers)
 
 # This is the include directory for the XLA headers
