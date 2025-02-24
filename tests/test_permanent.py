@@ -1,4 +1,4 @@
-from permanent import perm
+from perm.permanent import perm
 import numpy as np
 from assym import assym_reduce
 
