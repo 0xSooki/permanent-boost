@@ -7,11 +7,9 @@
 #ifndef DEBUG
 #include <iostream>
 #endif
-#include <thrust/complex.h>
 
 #ifdef __CUDACC__
 #include <cuda_runtime.h>
-#include <thrust/complex.h>
 #define HOST_DEVICE __host__ __device__
 #else
 #define HOST_DEVICE

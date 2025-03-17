@@ -31,7 +31,7 @@ link_directories(${TBB_LIBRARY_DIRS})
 include_directories(${CMAKE_CURRENT_LIST_DIR}/src)
 
 # Determine the XLA include directory via Python
-# set(Python_EXECUTABLE /opt/anaconda3/envs/piq1/bin/python3.12)
+set(Python_EXECUTABLE /opt/anaconda3/envs/perm/bin/python3.12)
 execute_process(
   COMMAND "${Python_EXECUTABLE}" "-c" "from jax import ffi; print(ffi.include_dir())"
   OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE XLA_DIR)
