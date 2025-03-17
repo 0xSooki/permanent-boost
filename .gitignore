@@ -145,3 +145,9 @@ _skbuild/
 
 CMakeFiles/
 .DS_Store
+venv/
+bin/
+share/
+lib/
+include/
+lib64/
