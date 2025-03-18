@@ -18,8 +18,9 @@ ffi::Error FooBwdHost(cudaStream_t stream,
                       ffi::ResultBuffer<ffi::F32> b_grad,
                       size_t n);
 
-// ffi::Error PermanentImpl2(cudaStream_t stream, ffi::Buffer<ffi::C128> A, ffi::Buffer<ffi::U32> rows,
-//                           ffi::Buffer<ffi::U32> cols,
-//                           ffi::ResultBuffer<ffi::C128> y);
+ffi::Error PermanentHost(cudaStream_t stream, ffi::Buffer<ffi::C128> A,
+                         ffi::Buffer<ffi::U32> rows,
+                         ffi::Buffer<ffi::U32> cols,
+                         ffi::ResultBuffer<ffi::C128> permanent);
 
 #endif // KERNELS_H_

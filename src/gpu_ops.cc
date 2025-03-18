@@ -27,6 +27,15 @@ XLA_FFI_DEFINE_HANDLER_SYMBOL(
         .Attr<size_t>("n"),
     {xla::ffi::Traits::kCmdBufferCompatible}); // cudaGraph enabled
 
+XLA_FFI_DEFINE_HANDLER_SYMBOL(Permanent, PermanentHost,
+                              ffi::Ffi::Bind()
+                                  .Ctx<ffi::PlatformStream<cudaStream_t>>() // stream
+                                  .Arg<ffi::Buffer<ffi::C128>>()
+                                  .Arg<ffi::Buffer<ffi::U32>>()
+                                  .Arg<ffi::Buffer<ffi::U32>>()
+                                  .Ret<ffi::Buffer<ffi::C128>>(),
+                              {xla::ffi::Traits::kCmdBufferCompatible}); // cudaGraph enabled
+
 template <typename T>
 py::capsule EncapsulateFfiHandler(T *fn)
 {
@@ -38,21 +47,22 @@ py::capsule EncapsulateFfiHandler(T *fn)
 PYBIND11_MODULE(gpu_ops, m)
 {
   m.doc() = R"pbdoc(
-        Permanent calculator plugin
-        -----------------------
+Permanent calculator plugin
+-----------------------
 
-        .. currentmodule:: scikit_build_example
+.. currentmodule:: scikit_build_example
 
-        .. autosummary::
-           :toctree: _generate
+.. autosummary::
+:toctree: _generate
 
-           permanent
-    )pbdoc";
+permanent
+)pbdoc";
   m.def("foo", []()
         {
-    py::dict registrations;
-    registrations["foo_fwd"] = EncapsulateFfiHandler(FooFwd);
-    registrations["foo_bwd"] = EncapsulateFfiHandler(FooBwd);
-    return registrations; });
+py::dict registrations;
+registrations["foo_fwd"] = EncapsulateFfiHandler(FooFwd);
+registrations["foo_bwd"] = EncapsulateFfiHandler(FooBwd);
+registrations["permm"] = EncapsulateFfiHandler(Permanent);
+return registrations; });
   m.attr("__version__") = "dev";
 }

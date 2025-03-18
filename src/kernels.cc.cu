@@ -15,6 +15,23 @@ limitations under the License.
 
 #include "kernels.h"
 #include <cuda/std/complex>
+#include <cuComplex.h>
+
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 600
+__device__ double atomicAdd(double *address, double val)
+{
+  unsigned long long int *address_as_ull = (unsigned long long int *)address;
+  unsigned long long int old = *address_as_ull;
+  unsigned long long int assumed;
+  do
+  {
+    assumed = old;
+    old = atomicCAS(address_as_ull, assumed,
+                    __double_as_longlong(val + __longlong_as_double(assumed)));
+  } while (assumed != old);
+  return __longlong_as_double(old);
+}
+#endif
 
 //----------------------------------------------------------------------------//
 //                            Forward pass                                    //
@@ -117,6 +134,80 @@ ffi::Error FooBwdHost(cudaStream_t stream,
   {
     return ffi::Error::Internal(
         std::string("CUDA error: ") + cudaGetErrorString(last_error));
+  }
+  return ffi::Error::Success();
+}
+
+// Remove or comment out the old permanent() implementation
+/*
+template <typename scalar_type, typename precision_type>
+std::complex<double> permanent(Matrix<std::complex<double>> &A,
+                               std::vector<int> &rows, std::vector<int> &cols)
+{
+    // ...existing code...
+}
+*/
+
+// New device functions and kernel modifications using cuDoubleComplex:
+
+__device__ void atAddComplex(cuDoubleComplex *a, cuDoubleComplex b)
+{
+  // transform the addresses of real and imag. parts to double pointers
+  double *x = (double *)a;
+  double *y = x + 1;
+  // use atomicAdd for double variables
+  atomicAdd(x, cuCreal(b));
+  atomicAdd(y, cuCimag(b));
+}
+
+// Kernel: for each work item (job_idx) compute a partial addend.
+__global__ void PermanentKernel(const cuDoubleComplex *A, int A_rows, int A_cols,
+                                const int *rows, int rows_size,
+                                const int *cols, int cols_size,
+                                uint64_t idx_max, cuDoubleComplex *result)
+{
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  atAddComplex(result, A[i]);
+}
+
+template <ffi::DataType T>
+std::pair<int64_t, int64_t> get_dims(const ffi::Buffer<T> &buffer)
+{
+  auto dims = buffer.dimensions();
+
+  if (dims.size() == 0)
+  {
+    return std::make_pair(0, 0);
+  }
+  return std::make_pair(buffer.element_count(), dims.back());
+}
+
+// Host wrapper that launches the PermanentKernel.
+ffi::Error PermanentHost(cudaStream_t stream, ffi::Buffer<ffi::C128> A,
+                         ffi::Buffer<ffi::U32> rows,
+                         ffi::Buffer<ffi::U32> cols,
+                         ffi::ResultBuffer<ffi::C128> permanent)
+{
+  const int block_dim = 128;
+  const int grid_dim = 64;
+
+  // Reset result to zero.
+  cudaMemset(permanent->typed_data(), 0, sizeof(cuDoubleComplex));
+
+  auto [total_size, n] = get_dims(A);
+
+  PermanentKernel<<<grid_dim, block_dim, 0, stream>>>(
+      reinterpret_cast<const cuDoubleComplex *>(A.typed_data()),
+      n, n,
+      reinterpret_cast<const int *>(rows.typed_data()), n,
+      reinterpret_cast<const int *>(cols.typed_data()), n,
+      n,
+      reinterpret_cast<cuDoubleComplex *>(permanent->typed_data()));
+
+  cudaError_t last_error = cudaGetLastError();
+  if (last_error != cudaSuccess)
+  {
+    return ffi::Error::Internal(std::string("CUDA error: ") + cudaGetErrorString(last_error));
   }
   return ffi::Error::Success();
 }
