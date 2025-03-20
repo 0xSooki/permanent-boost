@@ -18,7 +18,8 @@ namespace ffi = xla::ffi;
 
 template <typename T>
 T permanent_np(py::array_t<T, py::array::c_style | py::array::forcecast> array,
-               py::array_t<int> rows, py::array_t<int> cols) {
+               py::array_t<int> rows, py::array_t<int> cols)
+{
   Matrix<T> matrix = numpy_to_matrix(array);
 
   std::vector<int> row_mult = numpy_to_vec(rows);
@@ -31,10 +32,12 @@ T permanent_np(py::array_t<T, py::array::c_style | py::array::forcecast> array,
 }
 
 template <ffi::DataType T>
-std::pair<int64_t, int64_t> get_dims(const ffi::Buffer<T> &buffer) {
+std::pair<int64_t, int64_t> get_dims(const ffi::Buffer<T> &buffer)
+{
   auto dims = buffer.dimensions();
 
-  if (dims.size() == 0) {
+  if (dims.size() == 0)
+  {
     return std::make_pair(0, 0);
   }
   return std::make_pair(buffer.element_count(), dims.back());
@@ -42,10 +45,12 @@ std::pair<int64_t, int64_t> get_dims(const ffi::Buffer<T> &buffer) {
 
 ffi::Error PermanentImpl(ffi::Buffer<ffi::C128> A, ffi::Buffer<ffi::U64> rows,
                          ffi::Buffer<ffi::U64> cols,
-                         ffi::ResultBuffer<ffi::C128> y) {
+                         ffi::ResultBuffer<ffi::C128> y)
+{
   auto [total_size, n] = get_dims(A);
 
-  if (n == 0) {
+  if (n == 0)
+  {
     return ffi::Error::InvalidArgument("Perm input must be a matrix");
   }
   std::vector<int> row_mult(&(rows.typed_data()[0]),
@@ -71,9 +76,11 @@ XLA_FFI_DEFINE_HANDLER_SYMBOL(Permanent, PermanentImpl,
 ffi::Error PermFwdImpl(ffi::Buffer<ffi::C128> A, ffi::Buffer<ffi::U64> rows,
                        ffi::Buffer<ffi::U64> cols,
                        ffi::ResultBuffer<ffi::C128> y,
-                       ffi::ResultBuffer<ffi::C128> res) {
+                       ffi::ResultBuffer<ffi::C128> res)
+{
   auto [total_size, n] = get_dims(A);
-  if (n == 0) {
+  if (n == 0)
+  {
     return ffi::Error::InvalidArgument("Permanent input must be a matrix");
   }
 
@@ -102,12 +109,15 @@ XLA_FFI_DEFINE_HANDLER_SYMBOL(PermFwd, PermFwdImpl,
 
 void ComputePermBwd(std::complex<double> res, Matrix<std::complex<double>> &A,
                     std::vector<int> &rows, std::vector<int> &cols,
-                    std::complex<double> *ct_y, std::complex<double> *ct_x) {
+                    std::complex<double> *ct_x)
+{
 
   Matrix<std::complex<double>> grad = grad_perm(A, rows, cols);
 
-  for (int64_t i = 0; i < grad.rows; ++i) {
-    for (int64_t j = 0; j < grad.cols; ++j) {
+  for (int64_t i = 0; i < grad.rows; ++i)
+  {
+    for (int64_t j = 0; j < grad.cols; ++j)
+    {
       ct_x[i * A.cols + j] = grad(i, j);
     }
   }
@@ -115,10 +125,11 @@ void ComputePermBwd(std::complex<double> res, Matrix<std::complex<double>> &A,
 
 ffi::Error PermBwdImpl(ffi::Buffer<ffi::C128> res, ffi::Buffer<ffi::C128> A,
                        ffi::Buffer<ffi::U64> rows, ffi::Buffer<ffi::U64> cols,
-                       ffi::Buffer<ffi::C128> ct_y,
-                       ffi::ResultBuffer<ffi::C128> ct_x) {
+                       ffi::ResultBuffer<ffi::C128> ct_x)
+{
   auto [total_size, n] = get_dims(A);
-  if (n == 0) {
+  if (n == 0)
+  {
     return ffi::Error::InvalidArgument("RmsNormBwd inputs must be arrays");
   }
 
@@ -128,7 +139,7 @@ ffi::Error PermBwdImpl(ffi::Buffer<ffi::C128> res, ffi::Buffer<ffi::C128> A,
   Matrix<std::complex<double>> matrix(total_size / n, n, &(A.typed_data()[0]));
 
   ComputePermBwd(res.typed_data()[0], matrix, row_mult, col_mult,
-                 &(ct_y.typed_data()[0]), &(ct_x->typed_data()[0]));
+                 &(ct_x->typed_data()[0]));
 
   return ffi::Error::Success();
 }
@@ -139,17 +150,19 @@ XLA_FFI_DEFINE_HANDLER_SYMBOL(PermBwd, PermBwdImpl,
                                   .Arg<ffi::Buffer<ffi::C128>>() // A
                                   .Arg<ffi::Buffer<ffi::U64>>()  // rows
                                   .Arg<ffi::Buffer<ffi::U64>>()  // cols
-                                  .Arg<ffi::Buffer<ffi::C128>>() // ct_y
                                   .Ret<ffi::Buffer<ffi::C128>>() // ct_x
 );
 
-template <typename T> py::capsule EncapsulateFfiHandler(T *fn) {
+template <typename T>
+py::capsule EncapsulateFfiHandler(T *fn)
+{
   static_assert(std::is_invocable_r_v<XLA_FFI_Error *, T, XLA_FFI_CallFrame *>,
                 "Encapsulated function must be and XLA FFI handler");
   return py::capsule(reinterpret_cast<void *>(fn));
 }
 
-PYBIND11_MODULE(_core, m) {
+PYBIND11_MODULE(_core, m)
+{
   m.doc() = R"pbdoc(
         Permanent calculator plugin
         -----------------------
@@ -164,13 +177,13 @@ PYBIND11_MODULE(_core, m) {
   m.def("permanent", &permanent_np<std::complex<double>>, R"pbdoc(
         Compute the permanent of a matrix with specified row and column multiplicities.
     )pbdoc");
-  m.def("registrations", []() {
+  m.def("registrations", []()
+        {
     py::dict registrations;
     registrations["perm"] = EncapsulateFfiHandler(Permanent);
     registrations["perm_fwd"] = EncapsulateFfiHandler(PermFwd);
     registrations["perm_bwd"] = EncapsulateFfiHandler(PermBwd);
-    return registrations;
-  });
+    return registrations; });
 
   m.attr("__version__") = "dev";
 }

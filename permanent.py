@@ -37,16 +37,16 @@ def perm_fwd(A, rows, cols):
     return y, (res, A, rows, cols)
 
 
-def perm_bwd(res, ct):
+def perm_bwd(res, _):
     res, A, rows, cols = res
     # assert res.shape == ct.shape[:-1]
     # assert A.shape == ct.shape
     return (
         jax.ffi.ffi_call(
             "perm_bwd",
-            jax.ShapeDtypeStruct((A.shape), ct.dtype),
+            jax.ShapeDtypeStruct((A.shape), A.dtype),
             vmap_method="broadcast_all",
-        )(res, A, rows, cols, ct), None, None
+        )(res, A, rows, cols), None, None
     )
 
 
