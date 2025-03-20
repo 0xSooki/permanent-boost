@@ -1,9 +1,12 @@
 #ifndef n_aryGrayCodeCounter_H
 #define n_aryGrayCodeCounter_H
 
-#include <cstdint>
-#include <stdexcept>
-#include <string>
+#ifdef __CUDACC__
+#include <cuda_runtime.h>
+#define HOST_DEVICE __host__ __device__
+#else
+#define HOST_DEVICE
+#endif
 
 /**
 @brief Class to iterate over n-ary reflected gray codes using pointers.
@@ -25,13 +28,13 @@ public:
   // the current offset in the counter (0<= offset <= offset_max)
   int64_t offset;
 
-  n_aryGrayCodeCounter(const n_aryGrayCodeCounter &) = delete;
-  n_aryGrayCodeCounter &operator=(const n_aryGrayCodeCounter &) = delete;
+  HOST_DEVICE n_aryGrayCodeCounter(const n_aryGrayCodeCounter &) = delete;
+  HOST_DEVICE n_aryGrayCodeCounter &operator=(const n_aryGrayCodeCounter &) = delete;
 
   /**
   @brief Helper function to allocate arrays given num_digits.
   */
-  void allocate_arrays(size_t n)
+  HOST_DEVICE void allocate_arrays(size_t n)
   {
     num_digits = n;
     if (num_digits > 0)
@@ -51,7 +54,7 @@ public:
   /**
   @brief Default constructor of the class.
   */
-  n_aryGrayCodeCounter()
+  HOST_DEVICE n_aryGrayCodeCounter()
   {
     num_digits = 0;
     n_ary_limits = nullptr;
@@ -66,7 +69,7 @@ public:
   @param limits Array of maximal values of the individual gray code elements.
   @param n Length of the limits array.
   */
-  n_aryGrayCodeCounter(int limits[], size_t n)
+  HOST_DEVICE n_aryGrayCodeCounter(int limits[], size_t n)
   {
     allocate_arrays(n);
     if (num_digits == 0)
@@ -100,7 +103,7 @@ public:
   @param n Length of the limits array.
   @param initial_offset The initial offset of the counter (0<=initial_offset<=offset_max).
   */
-  n_aryGrayCodeCounter(int limits[], size_t n, int64_t initial_offset)
+  HOST_DEVICE n_aryGrayCodeCounter(int limits[], size_t n, int64_t initial_offset)
   {
     allocate_arrays(n);
     if (num_digits == 0)
@@ -130,7 +133,7 @@ public:
   /**
   @brief Destructor cleans up allocated dynamic arrays.
   */
-  ~n_aryGrayCodeCounter()
+  HOST_DEVICE ~n_aryGrayCodeCounter()
   {
     delete[] n_ary_limits;
     delete[] gray_code;
@@ -140,17 +143,18 @@ public:
   /**
   @brief Initialize the gray counter by zero offset.
   */
-  void initialize() { initialize(0); }
+  HOST_DEVICE void initialize() { initialize(0); }
 
   /**
   @brief Initialize the gray counter to a specific initial offset.
   @param initial_offset The initial offset of the counter (0<= initial_offset <= offset_max).
   */
-  void initialize(int64_t initial_offset)
+  HOST_DEVICE void initialize(int64_t initial_offset)
   {
     if (initial_offset < 0 || initial_offset > offset_max)
     {
-      throw std::runtime_error("n_aryGrayCodeCounter::initialize: Wrong value of initial_offset");
+      printf("n_aryGrayCodeCounter::initialize: Wrong value of initial_offset");
+      return;
     }
 
     // generate counter chain
@@ -175,13 +179,13 @@ public:
   @brief Get the current gray code counter value.
   @return Pointer to an array of ints representing the current gray code.
   */
-  int *get() { return gray_code; }
+  HOST_DEVICE int *get() { return gray_code; }
 
   /**
   @brief Iterate the counter to the next value.
   @return Returns 0 on success, or 1 if the counter has reached the maximal offset.
   */
-  int next()
+  HOST_DEVICE int next()
   {
     int changed_index;
     int ret = next(changed_index);
@@ -193,7 +197,7 @@ public:
   @param changed_index The index of the gray code element where change occurred.
   @return Returns 0 on success, or 1 if the counter has reached the maximal offset.
   */
-  int next(int &changed_index)
+  HOST_DEVICE int next(int &changed_index)
   {
     int value_prev, value;
     int ret = next(changed_index, value_prev, value);
@@ -207,7 +211,7 @@ public:
   @param value The new value of the gray code element.
   @return Returns 0 on success, or 1 if the counter has reached the maximal offset.
   */
-  int next(int &changed_index, int &value_prev, int &value)
+  HOST_DEVICE int next(int &changed_index, int &value_prev, int &value)
   {
     changed_index = 0;
 
@@ -254,9 +258,9 @@ public:
     return 0;
   }
 
-  void set_offset_max(const int64_t &value) { offset_max = value; }
-  int64_t get_offset_max() { return offset_max; }
-  int64_t get_offset() { return offset; }
+  HOST_DEVICE void set_offset_max(const int64_t &value) { offset_max = value; }
+  HOST_DEVICE int64_t get_offset_max() { return offset_max; }
+  HOST_DEVICE int64_t get_offset() { return offset; }
 
 }; // n_aryGrayCodeCounter
 
