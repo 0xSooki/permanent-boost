@@ -63,6 +63,19 @@ def perm(A, rows, cols):
   )(A, rows, cols)
 
 
+@partial(jax.custom_vjp)
+def perm2(A, rows, cols):
+  if A.dtype != jnp.complex128:
+      raise ValueError("Only the float32 dtype is implemented by rms_norm")
+
+  out_type = jax.ShapeDtypeStruct((), A.dtype)
+
+  return jax.ffi.ffi_call(
+      "permm2",
+      out_type,
+      vmap_method="broadcast_all",
+  )(A, rows, cols)
+
 def perm_fwd():
   pass
 
@@ -70,7 +83,7 @@ def perm_bwd():
   pass
 
 perm.defvjp(perm_fwd, perm_bwd)
-
+perm2.defvjp(perm_fwd, perm_bwd)
 
 
 interferometer = jnp.array(
@@ -126,6 +139,7 @@ interferometer = jnp.array(
     ], dtype=jnp.complex128
 )
 
-input = output = jnp.ones(6, dtype=jnp.uint32)
+input = output = jnp.ones(6, dtype=jnp.uint64)
 print(np.sum(interferometer))
 print(perm(interferometer, input, output))
+print(perm2(interferometer, input, output))

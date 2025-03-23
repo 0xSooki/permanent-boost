@@ -31,38 +31,48 @@ XLA_FFI_DEFINE_HANDLER_SYMBOL(Permanent, PermanentHost,
                               ffi::Ffi::Bind()
                                   .Ctx<ffi::PlatformStream<cudaStream_t>>() // stream
                                   .Arg<ffi::Buffer<ffi::C128>>()
-                                  .Arg<ffi::Buffer<ffi::U32>>()
-                                  .Arg<ffi::Buffer<ffi::U32>>()
+                                  .Arg<ffi::Buffer<ffi::U64>>()
+                                  .Arg<ffi::Buffer<ffi::U64>>()
+                                  .Ret<ffi::Buffer<ffi::C128>>(),
+                              {xla::ffi::Traits::kCmdBufferCompatible}); // cudaGraph enabled
+
+XLA_FFI_DEFINE_HANDLER_SYMBOL(PermanentM, PermanentHostMatrixFromBuffer,
+                              ffi::Ffi::Bind()
+                                  .Ctx<ffi::PlatformStream<cudaStream_t>>() // stream
+                                  .Arg<ffi::Buffer<ffi::C128>>()
+                                  .Arg<ffi::Buffer<ffi::U64>>()
+                                  .Arg<ffi::Buffer<ffi::U64>>()
                                   .Ret<ffi::Buffer<ffi::C128>>(),
                               {xla::ffi::Traits::kCmdBufferCompatible}); // cudaGraph enabled
 
 template <typename T>
 py::capsule EncapsulateFfiHandler(T *fn)
 {
-  static_assert(std::is_invocable_r_v<XLA_FFI_Error *, T, XLA_FFI_CallFrame *>,
-                "Encapsulated function must be and XLA FFI handler");
-  return py::capsule(reinterpret_cast<void *>(fn));
+    static_assert(std::is_invocable_r_v<XLA_FFI_Error *, T, XLA_FFI_CallFrame *>,
+                  "Encapsulated function must be and XLA FFI handler");
+    return py::capsule(reinterpret_cast<void *>(fn));
 }
 
 PYBIND11_MODULE(gpu_ops, m)
 {
-  m.doc() = R"pbdoc(
-Permanent calculator plugin
------------------------
-
-.. currentmodule:: scikit_build_example
-
-.. autosummary::
-:toctree: _generate
-
-permanent
-)pbdoc";
-  m.def("foo", []()
-        {
-py::dict registrations;
-registrations["foo_fwd"] = EncapsulateFfiHandler(FooFwd);
-registrations["foo_bwd"] = EncapsulateFfiHandler(FooBwd);
-registrations["permm"] = EncapsulateFfiHandler(Permanent);
-return registrations; });
-  m.attr("__version__") = "dev";
+    m.doc() = R"pbdoc(
+          Permanent calculator plugin
+          -----------------------
+  
+          .. currentmodule:: scikit_build_example
+  
+          .. autosummary::
+             :toctree: _generate
+  
+             permanent
+      )pbdoc";
+    m.def("foo", []()
+          {
+      py::dict registrations;
+      registrations["foo_fwd"] = EncapsulateFfiHandler(FooFwd);
+      registrations["foo_bwd"] = EncapsulateFfiHandler(FooBwd);
+      registrations["permm"] = EncapsulateFfiHandler(Permanent);
+      registrations["permm2"] = EncapsulateFfiHandler(PermanentM);
+      return registrations; });
+    m.attr("__version__") = "dev";
 }

@@ -16,6 +16,8 @@ limitations under the License.
 #include "kernels.h"
 #include <cuda/std/complex>
 #include <cuComplex.h>
+#include "matrix.hpp"
+#include "utils.hpp"
 
 #if defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 600
 __device__ double atomicAdd(double *address, double val)
@@ -184,8 +186,8 @@ std::pair<int64_t, int64_t> get_dims(const ffi::Buffer<T> &buffer)
 
 // Host wrapper that launches the PermanentKernel.
 ffi::Error PermanentHost(cudaStream_t stream, ffi::Buffer<ffi::C128> A,
-                         ffi::Buffer<ffi::U32> rows,
-                         ffi::Buffer<ffi::U32> cols,
+                         ffi::Buffer<ffi::U64> rows,
+                         ffi::Buffer<ffi::U64> cols,
                          ffi::ResultBuffer<ffi::C128> permanent)
 {
   const int block_dim = 128;
@@ -201,8 +203,43 @@ ffi::Error PermanentHost(cudaStream_t stream, ffi::Buffer<ffi::C128> A,
       n, n,
       reinterpret_cast<const int *>(rows.typed_data()), n,
       reinterpret_cast<const int *>(cols.typed_data()), n,
-      n,
-      reinterpret_cast<cuDoubleComplex *>(permanent->typed_data()));
+      n, reinterpret_cast<cuDoubleComplex *>(permanent->typed_data()));
+
+  cudaError_t last_error = cudaGetLastError();
+  if (last_error != cudaSuccess)
+  {
+    return ffi::Error::Internal(std::string("CUDA error: ") + cudaGetErrorString(last_error));
+  }
+  return ffi::Error::Success();
+}
+
+__global__ void PermanentKernelMatrix(Matrix<cuDoubleComplex> A, cuDoubleComplex *result)
+{
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  atAddComplex(result, A[i]);
+}
+
+ffi::Error PermanentHostMatrixFromBuffer(cudaStream_t stream, ffi::Buffer<ffi::C128> A,
+                                         ffi::Buffer<ffi::U64> rows,
+                                         ffi::Buffer<ffi::U64> cols,
+                                         ffi::ResultBuffer<ffi::C128> permanent)
+{
+  // const int block_dim = 128;
+  auto [total_size, n] = get_dims(A);
+  Matrix<cuDoubleComplex> m(n, n, reinterpret_cast<cuDoubleComplex *>(A.typed_data()));
+  // const int grid_dim = (n * n + block_dim - 1) / block_dim;
+
+  const int block_dim = 128;
+  const int grid_dim = 64;
+
+  cudaMemset(permanent->typed_data(), 0, sizeof(cuDoubleComplex));
+
+  // Reset result to zero.
+  // cudaMemset(permanent->typed_data(), 0, sizeof(cuDoubleComplex));
+
+  PermanentKernelMatrix<<<grid_dim, block_dim, 0, stream>>>(m,
+                                                            reinterpret_cast<cuDoubleComplex *>(permanent->typed_data()));
 
   cudaError_t last_error = cudaGetLastError();
   if (last_error != cudaSuccess)
