@@ -10,12 +10,20 @@ jax.config.update("jax_enable_x64", True)
 for name, target in sooki.registrations().items():
     jax.ffi.register_ffi_target(name, target)
 
-for name, target in sooki.gpu_ops.foo().items():
-    print(name, target)
-    jax.ffi.register_ffi_target(name, target, platform="CUDA")
+gpu = False
+gpu_targets = {}
+if hasattr(sooki, 'gpu_ops'):
+    try:
+        gpu_targets = sooki.gpu_ops.foo()
+        for name, target in gpu_targets.items():
+            jax.ffi.register_ffi_target(name, target, platform="CUDA")
+            gpu = True
+    except (ImportError, AttributeError) as e:
+        print(f"GPU support initialization failed: {e}")
+        gpu = False
+else:
+    print("No GPU module found. Continuing with CPU support only.")
 
-import jax
-import numpy as np
 
 @partial(jax.custom_vjp)
 def permx(A, rows, cols):
@@ -26,10 +34,10 @@ def permx(A, rows, cols):
 
     def impl(target_name):
         return lambda A: jax.ffi.ffi_call(
-        target_name,
-        out_type,
-        vmap_method="broadcast_all",
-    )(A, rows, cols)
+            target_name,
+            out_type,
+            vmap_method="broadcast_all",
+        )(A, rows, cols)
 
     return jax.lax.platform_dependent(
         A,
@@ -37,13 +45,17 @@ def permx(A, rows, cols):
         cuda=impl("permm2")
     )
 
+
 def perm_fwd():
-  pass
+    pass
+
 
 def perm_bwd():
-  pass
+    pass
+
 
 permx.defvjp(perm_fwd, perm_bwd)
+
 
 @partial(jax.custom_vjp)
 def perm(A, rows, cols):
@@ -82,5 +94,6 @@ def perm_bwd(res, _):
             vmap_method="broadcast_all",
         )(res, A, rows, cols), None, None
     )
+
 
 perm.defvjp(perm_fwd, perm_bwd)
