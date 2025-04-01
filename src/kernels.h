@@ -18,11 +18,6 @@ ffi::Error FooBwdHost(cudaStream_t stream,
                       ffi::ResultBuffer<ffi::F32> b_grad,
                       size_t n);
 
-ffi::Error PermanentHost(cudaStream_t stream, ffi::Buffer<ffi::C128> A,
-                         ffi::Buffer<ffi::U64> rows,
-                         ffi::Buffer<ffi::U64> cols,
-                         ffi::ResultBuffer<ffi::C128> permanent);
-
 ffi::Error PermanentHostMatrixFromBuffer(cudaStream_t stream, ffi::Buffer<ffi::C128> A,
                                          ffi::Buffer<ffi::U64> rows,
                                          ffi::Buffer<ffi::U64> cols,

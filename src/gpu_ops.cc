@@ -27,15 +27,6 @@ XLA_FFI_DEFINE_HANDLER_SYMBOL(
         .Attr<size_t>("n"),
     {xla::ffi::Traits::kCmdBufferCompatible}); // cudaGraph enabled
 
-XLA_FFI_DEFINE_HANDLER_SYMBOL(Permanent, PermanentHost,
-                              ffi::Ffi::Bind()
-                                  .Ctx<ffi::PlatformStream<cudaStream_t>>() // stream
-                                  .Arg<ffi::Buffer<ffi::C128>>()
-                                  .Arg<ffi::Buffer<ffi::U64>>()
-                                  .Arg<ffi::Buffer<ffi::U64>>()
-                                  .Ret<ffi::Buffer<ffi::C128>>(),
-                              {xla::ffi::Traits::kCmdBufferCompatible}); // cudaGraph enabled
-
 XLA_FFI_DEFINE_HANDLER_SYMBOL(PermanentM, PermanentHostMatrixFromBuffer,
                               ffi::Ffi::Bind()
                                   .Ctx<ffi::PlatformStream<cudaStream_t>>() // stream
@@ -71,7 +62,6 @@ PYBIND11_MODULE(gpu_ops, m)
       py::dict registrations;
       registrations["foo_fwd"] = EncapsulateFfiHandler(FooFwd);
       registrations["foo_bwd"] = EncapsulateFfiHandler(FooBwd);
-      registrations["permm"] = EncapsulateFfiHandler(Permanent);
       registrations["permm2"] = EncapsulateFfiHandler(PermanentM);
       return registrations; });
     m.attr("__version__") = "dev";

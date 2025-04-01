@@ -1,18 +1,3 @@
-/* Copyright 2024 The JAX Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-==============================================================================*/
-
 #include "kernels.h"
 #include <cuda/std/complex>
 #include <cuComplex.h>
@@ -36,16 +21,6 @@ __device__ double atomicAdd(double *address, double val)
 }
 #endif
 
-//----------------------------------------------------------------------------//
-//                            Forward pass                                    //
-//----------------------------------------------------------------------------//
-
-// c = a * (b+1)
-// This strawman operation works well for demo purposes because:
-// 1. it's simple enough to be quickly understood,
-// 2. it's complex enough to require intermediate outputs in grad computation,
-//    like many operations in practice do, and
-// 3. it does not have a built-in implementation in JAX.
 __global__ void FooFwdKernel(const cuda::std::complex<double> *a, const cuda::std::complex<double> *b, cuda::std::complex<double> *c,
                              cuda::std::complex<double> *b_plus_1, // intermediate output b+1
                              size_t n)
@@ -59,11 +34,6 @@ __global__ void FooFwdKernel(const cuda::std::complex<double> *a, const cuda::st
   }
 }
 
-// Host function wrapper that launches the kernel with hardcoded grid/block
-// size. Note, it uses types from XLA FFI. The return type must be ffi::Error.
-// Buffer type provides buffer dimensions, so the "n" argument here is not
-// strictly necessary, but it allows us to demonstrate the use of attributes
-// (.Attr in the FFI handler definition above).
 ffi::Error FooFwdHost(cudaStream_t stream, ffi::Buffer<ffi::C128> a,
                       ffi::Buffer<ffi::C128> b, ffi::ResultBuffer<ffi::C128> c,
                       ffi::ResultBuffer<ffi::C128> b_plus_1, size_t n)
@@ -77,10 +47,7 @@ ffi::Error FooFwdHost(cudaStream_t stream, ffi::Buffer<ffi::C128> a,
       reinterpret_cast<cuda::std::complex<double> *>(c->typed_data()),
       reinterpret_cast<cuda::std::complex<double> *>(b_plus_1->typed_data()),
       n);
-  // Check for launch time errors. Note that this function may also
-  // return error codes from previous, asynchronous launches. This
-  // means that an error status returned here could have been caused
-  // by a different kernel previously launched by XLA.
+
   cudaError_t last_error = cudaGetLastError();
   if (last_error != cudaSuccess)
   {
@@ -90,14 +57,6 @@ ffi::Error FooFwdHost(cudaStream_t stream, ffi::Buffer<ffi::C128> a,
   return ffi::Error::Success();
 }
 
-// Creates symbol FooFwd with C linkage that can be loaded using Python ctypes
-
-//----------------------------------------------------------------------------//
-//                            Backward pass                                   //
-//----------------------------------------------------------------------------//
-
-// compute da = dc * (b+1), and
-//         db = dc * a
 __global__ void FooBwdKernel(const float *c_grad,   // incoming gradient wrt c
                              const float *a,        // original input a
                              const float *b_plus_1, // intermediate output b+1
@@ -109,11 +68,6 @@ __global__ void FooBwdKernel(const float *c_grad,   // incoming gradient wrt c
   const size_t grid_stride = blockDim.x * gridDim.x;
   for (size_t i = tid; i < n; i += grid_stride)
   {
-    // In practice on GPUs b_plus_1 can be recomputed for practically free
-    // instead of storing it out and reusing, so the reuse here is a bit
-    // contrived. We do it to demonstrate residual/intermediate output passing
-    // between the forward and the backward pass which becomes useful when
-    // recomputation is more expensive than reuse.
     a_grad[i] = c_grad[i] * b_plus_1[i];
     b_grad[i] = c_grad[i] * a[i];
   }
@@ -141,18 +95,6 @@ ffi::Error FooBwdHost(cudaStream_t stream,
   return ffi::Error::Success();
 }
 
-// Remove or comment out the old permanent() implementation
-/*
-template <typename scalar_type, typename precision_type>
-std::complex<double> permanent(Matrix<std::complex<double>> &A,
-                               std::vector<int> &rows, std::vector<int> &cols)
-{
-    // ...existing code...
-}
-*/
-
-// New device functions and kernel modifications using cuDoubleComplex:
-
 __device__ void atAddComplex(cuDoubleComplex *a, cuDoubleComplex b)
 {
   // transform the addresses of real and imag. parts to double pointers
@@ -161,16 +103,6 @@ __device__ void atAddComplex(cuDoubleComplex *a, cuDoubleComplex b)
   // use atomicAdd for double variables
   atomicAdd(x, cuCreal(b));
   atomicAdd(y, cuCimag(b));
-}
-
-// Kernel: for each work item (job_idx) compute a partial addend.
-__global__ void PermanentKernel(const cuDoubleComplex *A, int A_rows, int A_cols,
-                                const int *rows, int rows_size,
-                                const int *cols, int cols_size,
-                                uint64_t idx_max, cuDoubleComplex *result)
-{
-  int i = blockIdx.x * blockDim.x + threadIdx.x;
-  atAddComplex(result, A[i]);
 }
 
 template <ffi::DataType T>
@@ -183,35 +115,6 @@ std::pair<int64_t, int64_t> get_dims(const ffi::Buffer<T> &buffer)
     return std::make_pair(0, 0);
   }
   return std::make_pair(buffer.element_count(), dims.back());
-}
-
-// Host wrapper that launches the PermanentKernel.
-ffi::Error PermanentHost(cudaStream_t stream, ffi::Buffer<ffi::C128> A,
-                         ffi::Buffer<ffi::U64> rows,
-                         ffi::Buffer<ffi::U64> cols,
-                         ffi::ResultBuffer<ffi::C128> permanent)
-{
-  const int block_dim = 128;
-  const int grid_dim = 64;
-
-  // Reset result to zero.
-  cudaMemset(permanent->typed_data(), 0, sizeof(cuDoubleComplex));
-
-  auto [total_size, n] = get_dims(A);
-
-  PermanentKernel<<<grid_dim, block_dim, 0, stream>>>(
-      reinterpret_cast<const cuDoubleComplex *>(A.typed_data()),
-      n, n,
-      reinterpret_cast<const int *>(rows.typed_data()), n,
-      reinterpret_cast<const int *>(cols.typed_data()), n,
-      n, reinterpret_cast<cuDoubleComplex *>(permanent->typed_data()));
-
-  cudaError_t last_error = cudaGetLastError();
-  if (last_error != cudaSuccess)
-  {
-    return ffi::Error::Internal(std::string("CUDA error: ") + cudaGetErrorString(last_error));
-  }
-  return ffi::Error::Success();
 }
 
 __global__ void PermanentKernelMatrix(Matrix<cuDoubleComplex> A, uint64_t *rows, size_t rows_size,
