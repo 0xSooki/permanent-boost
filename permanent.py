@@ -10,6 +10,52 @@ jax.config.update("jax_enable_x64", True)
 for name, target in sooki.registrations().items():
     jax.ffi.register_ffi_target(name, target)
 
+gpu = False
+gpu_targets = {}
+if hasattr(sooki, 'gpu_ops'):
+    try:
+        gpu_targets = sooki.gpu_ops.foo()
+        for name, target in gpu_targets.items():
+            jax.ffi.register_ffi_target(name, target, platform="CUDA")
+            gpu = True
+    except (ImportError, AttributeError) as e:
+        print(f"GPU support initialization failed: {e}")
+        gpu = False
+else:
+    print("No GPU module found. Continuing with CPU support only.")
+
+
+@partial(jax.custom_vjp)
+def permx(A, rows, cols):
+    if A.dtype != jnp.complex128:
+        raise ValueError("Only the float32 dtype is implemented by rms_norm")
+
+    out_type = jax.ShapeDtypeStruct((), A.dtype)
+
+    def impl(target_name):
+        return lambda A: jax.ffi.ffi_call(
+            target_name,
+            out_type,
+            vmap_method="broadcast_all",
+        )(A, rows, cols)
+
+    return jax.lax.platform_dependent(
+        A,
+        cpu=impl("perm"),
+        cuda=impl("permm2")
+    )
+
+
+def perm_fwd():
+    pass
+
+
+def perm_bwd():
+    pass
+
+
+permx.defvjp(perm_fwd, perm_bwd)
+
 
 @partial(jax.custom_vjp)
 def perm(A, rows, cols):
