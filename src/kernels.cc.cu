@@ -4,6 +4,7 @@
 #include "matrix.hpp"
 #include "utils.hpp"
 #include "n_aryGrayCodeCounter.hpp"
+#include <cuda_runtime.h>
 
 #if defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 600
 __device__ double atomicAdd(double *address, double val)
@@ -21,16 +22,45 @@ __device__ double atomicAdd(double *address, double val)
 }
 #endif
 
-__global__ void FooFwdKernel(const cuda::std::complex<double> *a, const cuda::std::complex<double> *b, cuda::std::complex<double> *c,
-                             cuda::std::complex<double> *b_plus_1, // intermediate output b+1
+__global__ void AddKernel(const cuDoubleComplex *a, cuDoubleComplex *result, size_t n)
+{
+  size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
+  const size_t grid_stride = blockDim.x * gridDim.x;
+
+  for (size_t i = tid; i < n; i += grid_stride)
+  {
+    printf("a[%zu] = %f + %fi\n", i, a[i].x, a[i].y);
+    result[i] = cuCadd(a[i], make_cuDoubleComplex(1, 1)); // Add +1 to each element
+  }
+}
+
+__global__ void FooFwdKernel(const cuDoubleComplex *a, const cuDoubleComplex *b,
+                             cuDoubleComplex *c,
+                             cuDoubleComplex *b_plus_1,
                              size_t n)
 {
   size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
   const size_t grid_stride = blockDim.x * gridDim.x;
+
+  if (tid == 0)
+  {
+    int child_block_size = 128;
+    int child_grid_size = (n + child_block_size - 1) / child_block_size;
+
+    AddKernel<<<child_grid_size, child_block_size>>>(
+        b,
+        b_plus_1,
+        n);
+
+    __syncthreads();
+  }
+
+  __syncthreads();
+
   for (size_t i = tid; i < n; i += grid_stride)
   {
-    b_plus_1[i] = b[i] + 1.0;
-    c[i] = a[i] * b_plus_1[i];
+    c[i] = cuCmul(a[i], b_plus_1[i]);
+    printf("c[%zu] = %f + %fi\n", i, c[i].x, c[i].y);
   }
 }
 
@@ -42,10 +72,10 @@ ffi::Error FooFwdHost(cudaStream_t stream, ffi::Buffer<ffi::C128> a,
   const int grid_dim = 1;
   // Note how we access regular Buffer data vs Result Buffer data:
   FooFwdKernel<<<grid_dim, block_dim, /*shared_mem=*/0, stream>>>(
-      reinterpret_cast<const cuda::std::complex<double> *>(a.typed_data()),
-      reinterpret_cast<const cuda::std::complex<double> *>(b.typed_data()),
-      reinterpret_cast<cuda::std::complex<double> *>(c->typed_data()),
-      reinterpret_cast<cuda::std::complex<double> *>(b_plus_1->typed_data()),
+      reinterpret_cast<const cuDoubleComplex *>(a.typed_data()),
+      reinterpret_cast<const cuDoubleComplex *>(b.typed_data()),
+      reinterpret_cast<cuDoubleComplex *>(c->typed_data()),
+      reinterpret_cast<cuDoubleComplex *>(b_plus_1->typed_data()),
       n);
 
   cudaError_t last_error = cudaGetLastError();
@@ -120,7 +150,6 @@ std::pair<int64_t, int64_t> get_dims(const ffi::Buffer<T> &buffer)
 __global__ void PermanentKernelMatrix(Matrix<cuDoubleComplex> A, uint64_t *rows, size_t rows_size,
                                       uint64_t *cols, size_t cols_size, cuDoubleComplex *result)
 {
-
   size_t min_idx = 0;
   uint64_t minelem = 0;
 
