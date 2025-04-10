@@ -14,7 +14,6 @@ XLA_FFI_DEFINE_HANDLER_SYMBOL(
         .Attr<size_t>("n"),
     {xla::ffi::Traits::kCmdBufferCompatible}); // cudaGraph enabled
 
-// Creates symbol FooBwd with C linkage that can be loaded using Python ctypes
 XLA_FFI_DEFINE_HANDLER_SYMBOL(
     FooBwd, FooBwdHost,
     ffi::Ffi::Bind()
@@ -35,6 +34,26 @@ XLA_FFI_DEFINE_HANDLER_SYMBOL(PermanentM, PermanentHostMatrixFromBuffer,
                                   .Arg<ffi::Buffer<ffi::U64>>()
                                   .Ret<ffi::Buffer<ffi::C128>>(),
                               {xla::ffi::Traits::kCmdBufferCompatible}); // cudaGraph enabled
+
+XLA_FFI_DEFINE_HANDLER_SYMBOL(PermFwd, PermFwdImpl,
+                              ffi::Ffi::Bind()
+                                  .Ctx<ffi::PlatformStream<cudaStream_t>>() // stream
+                                  .Arg<ffi::Buffer<ffi::C128>>()
+                                  .Arg<ffi::Buffer<ffi::U64>>()
+                                  .Arg<ffi::Buffer<ffi::U64>>()
+                                  .Ret<ffi::Buffer<ffi::C128>>()
+                                  .Ret<ffi::Buffer<ffi::C128>>(),
+                              {xla::ffi::Traits::kCmdBufferCompatible}); // cudaGraph enabled
+
+XLA_FFI_DEFINE_HANDLER_SYMBOL(PermBwd, PermBwdImpl,
+                              ffi::Ffi::Bind()
+                                  .Ctx<ffi::PlatformStream<cudaStream_t>>() // stream
+                                  .Arg<ffi::Buffer<ffi::C128>>()            // res
+                                  .Arg<ffi::Buffer<ffi::C128>>()            // A
+                                  .Arg<ffi::Buffer<ffi::U64>>()             // rows
+                                  .Arg<ffi::Buffer<ffi::U64>>()             // cols
+                                  .Ret<ffi::Buffer<ffi::C128>>(),           // ct_x
+                              {xla::ffi::Traits::kCmdBufferCompatible});    // cudaGraph enabled
 
 template <typename T>
 py::capsule EncapsulateFfiHandler(T *fn)
@@ -63,6 +82,8 @@ PYBIND11_MODULE(gpu_ops, m)
       registrations["foo_fwd"] = EncapsulateFfiHandler(FooFwd);
       registrations["foo_bwd"] = EncapsulateFfiHandler(FooBwd);
       registrations["permm2"] = EncapsulateFfiHandler(PermanentM);
+    registrations["dperm_fwd"] = EncapsulateFfiHandler(PermFwd);
+     registrations["dperm_bwd"] = EncapsulateFfiHandler(PermBwd);
       return registrations; });
     m.attr("__version__") = "dev";
 }

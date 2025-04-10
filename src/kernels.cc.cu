@@ -1,5 +1,4 @@
 #include "kernels.h"
-#include <cuda/std/complex>
 #include <cuComplex.h>
 #include "matrix.hpp"
 #include "utils.hpp"
@@ -21,16 +20,17 @@ __device__ double atomicAdd(double *address, double val)
 }
 #endif
 
-__global__ void FooFwdKernel(const cuda::std::complex<double> *a, const cuda::std::complex<double> *b, cuda::std::complex<double> *c,
-                             cuda::std::complex<double> *b_plus_1, // intermediate output b+1
+__global__ void FooFwdKernel(const cuDoubleComplex *a, const cuDoubleComplex *b, cuDoubleComplex *c,
+                             cuDoubleComplex *b_plus_1, // intermediate output b+1
                              size_t n)
 {
   size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
+  size_t j = blockIdx.y * blockDim.y + threadIdx.y;
   const size_t grid_stride = blockDim.x * gridDim.x;
   for (size_t i = tid; i < n; i += grid_stride)
   {
-    b_plus_1[i] = b[i] + 1.0;
-    c[i] = a[i] * b_plus_1[i];
+    b_plus_1[i] = cuCadd(b[i], make_cuDoubleComplex(1.0, 0.0));
+    c[i] = cuCmul(a[i], b_plus_1[i]);
   }
 }
 
@@ -39,13 +39,13 @@ ffi::Error FooFwdHost(cudaStream_t stream, ffi::Buffer<ffi::C128> a,
                       ffi::ResultBuffer<ffi::C128> b_plus_1, size_t n)
 {
   const int block_dim = 128;
-  const int grid_dim = 1;
+  const int grid_dim = 2;
   // Note how we access regular Buffer data vs Result Buffer data:
   FooFwdKernel<<<grid_dim, block_dim, /*shared_mem=*/0, stream>>>(
-      reinterpret_cast<const cuda::std::complex<double> *>(a.typed_data()),
-      reinterpret_cast<const cuda::std::complex<double> *>(b.typed_data()),
-      reinterpret_cast<cuda::std::complex<double> *>(c->typed_data()),
-      reinterpret_cast<cuda::std::complex<double> *>(b_plus_1->typed_data()),
+      reinterpret_cast<const cuDoubleComplex *>(a.typed_data()),
+      reinterpret_cast<const cuDoubleComplex *>(b.typed_data()),
+      reinterpret_cast<cuDoubleComplex *>(c->typed_data()),
+      reinterpret_cast<cuDoubleComplex *>(b_plus_1->typed_data()),
       n);
 
   cudaError_t last_error = cudaGetLastError();
@@ -326,5 +326,127 @@ ffi::Error PermanentHostMatrixFromBuffer(cudaStream_t stream, ffi::Buffer<ffi::C
   {
     return ffi::Error::Internal(std::string("CUDA error: ") + cudaGetErrorString(last_error));
   }
+  return ffi::Error::Success();
+}
+
+ffi::Error PermFwdImpl(cudaStream_t stream, ffi::Buffer<ffi::C128> A, ffi::Buffer<ffi::U64> rows,
+                       ffi::Buffer<ffi::U64> cols,
+                       ffi::ResultBuffer<ffi::C128> y,
+                       ffi::ResultBuffer<ffi::C128> res)
+{
+  const int block_dim = 128;
+  auto [total_size, n] = get_dims(A);
+  Matrix<cuDoubleComplex> m(n, n, reinterpret_cast<cuDoubleComplex *>(A.typed_data()));
+  const int grid_dim = (n * n + block_dim - 1) / block_dim;
+
+  cudaMemset(res->typed_data(), 0, sizeof(cuDoubleComplex));
+  cudaMemset(y->typed_data(), 0, sizeof(cuDoubleComplex));
+
+  PermanentKernelMatrix<<<grid_dim, block_dim, 0, stream>>>(
+      m, rows.typed_data(),
+      rows.element_count(),
+      cols.typed_data(),
+      cols.element_count(),
+      reinterpret_cast<cuDoubleComplex *>(y->typed_data()));
+
+  PermanentKernelMatrix<<<grid_dim, block_dim, 0, stream>>>(
+      m, rows.typed_data(),
+      rows.element_count(),
+      cols.typed_data(),
+      cols.element_count(),
+      reinterpret_cast<cuDoubleComplex *>(res->typed_data()));
+
+  cudaError_t last_error = cudaGetLastError();
+  if (last_error != cudaSuccess)
+  {
+    return ffi::Error::Internal(std::string("CUDA error: ") + cudaGetErrorString(last_error));
+  }
+  return ffi::Error::Success();
+}
+
+ffi::Error PermBwdImpl(cudaStream_t stream, ffi::Buffer<ffi::C128> res, ffi::Buffer<ffi::C128> A,
+                       ffi::Buffer<ffi::U64> rows, ffi::Buffer<ffi::U64> cols,
+                       ffi::ResultBuffer<ffi::C128> ct_x)
+{
+  auto [total_size, n] = get_dims(A);
+  if (n == 0)
+  {
+    return ffi::Error::InvalidArgument("Permanent backward inputs must be arrays");
+  }
+
+  uint64_t *h_rows = new uint64_t[n];
+  cudaMemcpy(h_rows, rows.typed_data(), n * sizeof(uint64_t), cudaMemcpyDeviceToHost);
+  uint64_t *h_cols = new uint64_t[n];
+  cudaMemcpy(h_cols, cols.typed_data(), n * sizeof(uint64_t), cudaMemcpyDeviceToHost);
+
+  Matrix<cuDoubleComplex> m(n, n, reinterpret_cast<cuDoubleComplex *>(A.typed_data()));
+
+  cudaMemset(ct_x->typed_data(), 0, n * n * sizeof(cuDoubleComplex));
+
+  for (size_t i = 0; i < n; ++i)
+  {
+    if (h_rows[i] == 0)
+      continue;
+
+    for (size_t j = 0; j < n; ++j)
+    {
+      if (h_cols[j] == 0)
+        continue;
+
+      uint64_t *grad_rows = new uint64_t[n];
+      uint64_t *grad_cols = new uint64_t[n];
+
+      // Copy and decrement
+      memcpy(grad_rows, h_rows, n * sizeof(uint64_t));
+      memcpy(grad_cols, h_cols, n * sizeof(uint64_t));
+      grad_rows[i] -= 1;
+      grad_cols[j] -= 1;
+
+      uint64_t *d_grad_rows, *d_grad_cols;
+      cudaMalloc(&d_grad_rows, n * sizeof(uint64_t));
+      cudaMalloc(&d_grad_cols, n * sizeof(uint64_t));
+      cudaMemcpyAsync(d_grad_rows, grad_rows, n * sizeof(uint64_t), cudaMemcpyHostToDevice, stream);
+      cudaMemcpyAsync(d_grad_cols, grad_cols, n * sizeof(uint64_t), cudaMemcpyHostToDevice, stream);
+
+      cuDoubleComplex *d_entry_result;
+      cudaMalloc(&d_entry_result, sizeof(cuDoubleComplex));
+      cudaMemset(d_entry_result, 0, sizeof(cuDoubleComplex));
+
+      const int block_dim = 128;
+      const int grid_dim = (n * n + block_dim - 1) / block_dim;
+      PermanentKernelMatrix<<<grid_dim, block_dim, 0, stream>>>(
+          m, d_grad_rows, n, d_grad_cols, n, d_entry_result);
+
+      cuDoubleComplex h_entry_result;
+      cudaMemcpyAsync(&h_entry_result, d_entry_result, sizeof(cuDoubleComplex), cudaMemcpyDeviceToHost, stream);
+
+      cudaStreamSynchronize(stream);
+
+      double scale = static_cast<double>(h_rows[i]) * static_cast<double>(h_cols[j]);
+      h_entry_result = cuCmul(h_entry_result, make_cuDoubleComplex(scale, 0.0));
+
+      cudaMemcpyAsync(
+          reinterpret_cast<cuDoubleComplex *>(ct_x->typed_data()) + i * n + j,
+          &h_entry_result,
+          sizeof(cuDoubleComplex),
+          cudaMemcpyHostToDevice,
+          stream);
+
+      cudaFree(d_grad_rows);
+      cudaFree(d_grad_cols);
+      cudaFree(d_entry_result);
+
+      delete[] grad_rows;
+      delete[] grad_cols;
+    }
+  }
+  delete[] h_rows;
+  delete[] h_cols;
+  cudaError_t last_error = cudaGetLastError();
+  if (last_error != cudaSuccess)
+  {
+    return ffi::Error::Internal(std::string("CUDA error: ") + cudaGetErrorString(last_error));
+  }
+
   return ffi::Error::Success();
 }

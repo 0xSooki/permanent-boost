@@ -7,5 +7,4 @@ try:
 except ImportError:
     pass
 
-__all__ = ["__doc__", "__version__",
-           "permanent", "registrations"]
+__all__ = ["__doc__", "__version__"]

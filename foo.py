@@ -6,9 +6,19 @@ import sooki
 
 jax.config.update("jax_enable_x64", True)
 
-for name, target in sooki.gpu_ops.foo().items():
-    print(name, target)
-    jax.ffi.register_ffi_target(name, target, platform="gpu")
+gpu = False
+gpu_targets = {}
+if hasattr(sooki, 'gpu_ops'):
+    try:
+        gpu_targets = sooki.gpu_ops.foo()
+        for name, target in gpu_targets.items():
+            jax.ffi.register_ffi_target(name, target, platform="CUDA")
+            gpu = True
+    except (ImportError, AttributeError) as e:
+        print(f"GPU support initialization failed: {e}")
+        gpu = False
+else:
+    print("No GPU module found. Continuing with CPU support only.")
 
 def foo_fwd(a, b):
   assert a.dtype == jnp.complex128
@@ -141,5 +151,5 @@ interferometer = jnp.array(
 
 input = output = jnp.ones(6, dtype=jnp.uint64)
 print(np.sum(interferometer))
-print(perm(interferometer, input, output))
+#print(perm(interferometer, input, output))
 print(perm2(interferometer, input, output))
