@@ -3,6 +3,7 @@
 #include "matrix.hpp"
 #include "utils.hpp"
 #include "n_aryGrayCodeCounter.hpp"
+#include <algorithm>
 
 #if defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 600
 __device__ double atomicAdd(double *address, double val)
@@ -115,6 +116,226 @@ std::pair<int64_t, int64_t> get_dims(const ffi::Buffer<T> &buffer)
     return std::make_pair(0, 0);
   }
   return std::make_pair(buffer.element_count(), dims.back());
+}
+
+__global__ void OPermanentKernelMatrix(Matrix<cuDoubleComplex> A, uint64_t *rows, size_t rows_size,
+                                       uint64_t *cols, size_t cols_size,
+                                       int *n_ary_limits, size_t n_ary_size, uint64_t idx_max,
+                                       cuDoubleComplex *result)
+{
+
+  int sum_rows = 0;
+  for (size_t i = 0; i < rows_size; i++)
+  {
+    sum_rows += rows[i];
+  }
+
+  int sum_cols = 0;
+  for (size_t i = 0; i < cols_size; i++)
+  {
+    sum_cols += cols[i];
+  }
+
+  size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
+  size_t stride = blockDim.x * gridDim.x;
+
+  cuDoubleComplex local_result = make_cuDoubleComplex(0.0, 0.0);
+
+  for (uint64_t idx = tid; idx < idx_max; idx += stride)
+  {
+
+    uint64_t temp_idx = idx;
+    int minus_signs_all = 0;
+    int binomial_coeff = 1;
+    int gcode[32];
+
+    for (size_t pos = 0; pos < n_ary_size; pos++)
+    {
+      gcode[pos] = temp_idx % n_ary_limits[pos];
+      temp_idx /= n_ary_limits[pos];
+      minus_signs_all += gcode[pos];
+      binomial_coeff *= binomialCoeffManual<int>(rows[pos + 1], gcode[pos]);
+    }
+
+    cuDoubleComplex colsum[32];
+    for (size_t i = 0; i < cols_size && i < 32; i++)
+    {
+      colsum[i] = A(0, i);
+    }
+    for (size_t row = 0; row < n_ary_size; row++)
+    {
+      int minus_signs = gcode[row];
+      int row_mult = rows[row + 1];
+      for (size_t col = 0; col < cols_size && col < 32; col++)
+      {
+        double factor = row_mult - 2.0 * minus_signs;
+        cuDoubleComplex scaled = cuCmul(A(row + 1, col),
+                                        make_cuDoubleComplex(factor, 0.0));
+        colsum[col] = cuCadd(colsum[col], scaled);
+      }
+    }
+
+    int parity = (minus_signs_all % 2 == 0) ? 1 : -1;
+
+    cuDoubleComplex term = make_cuDoubleComplex((double)parity, 0.0);
+    for (size_t i = 0; i < cols_size && i < 32; i++)
+    {
+      for (size_t j = 0; j < cols[i]; j++)
+      {
+        term = cuCmul(term, colsum[i]);
+      }
+    }
+
+    term = cuCmul(term, make_cuDoubleComplex((double)binomial_coeff, 0.0));
+
+    local_result = cuCadd(local_result, term);
+  }
+
+  double scale_factor = 1.0 / (1ULL << (sum_rows - 1));
+  local_result = cuCmul(local_result, make_cuDoubleComplex(scale_factor, 0.0));
+
+  atAddComplex(result, local_result);
+}
+
+ffi::Error PermanentHostMatrixFromBuffer(cudaStream_t stream, ffi::Buffer<ffi::C128> A,
+                                         ffi::Buffer<ffi::U64> rows,
+                                         ffi::Buffer<ffi::U64> cols,
+                                         ffi::ResultBuffer<ffi::C128> permanent)
+{
+  auto [total_size, n] = get_dims(A);
+
+  uint64_t *h_rows = new uint64_t[rows.element_count()];
+  size_t rows_size = rows.element_count();
+  cudaMemcpy(h_rows, rows.typed_data(), rows_size * sizeof(uint64_t), cudaMemcpyDeviceToHost);
+
+  size_t min_idx = 0;
+  uint64_t minelem = 0;
+
+  // Initialize the matrix
+  Matrix<cuDoubleComplex> m(n, n, reinterpret_cast<cuDoubleComplex *>(A.typed_data()));
+
+  if (rows_size > 0 && minelem != 0)
+  {
+    size_t new_size = rows_size + 1;
+    uint64_t *new_rows = new uint64_t[new_size];
+
+    new_rows[0] = 1;
+    for (size_t i = 0; i < rows_size; i++)
+    {
+      new_rows[i + 1] = h_rows[i];
+    }
+    new_rows[1 + min_idx] -= 1;
+
+    cuDoubleComplex *h_matrix = new cuDoubleComplex[n * n];
+    cudaMemcpy(h_matrix, A.typed_data(), n * n * sizeof(cuDoubleComplex), cudaMemcpyDeviceToHost);
+
+    // Create a new larger matrix
+    cuDoubleComplex *h_new_matrix = new cuDoubleComplex[(n + 1) * n];
+
+    for (size_t j = 0; j < n; j++)
+    {
+      h_new_matrix[j] = h_matrix[min_idx * n + j];
+    }
+
+    for (size_t i = 0; i < n; i++)
+    {
+      for (size_t j = 0; j < n; j++)
+      {
+        h_new_matrix[(i + 1) * n + j] = h_matrix[i * n + j];
+      }
+    }
+
+    cuDoubleComplex *d_new_matrix;
+    uint64_t *d_new_rows;
+    cudaMalloc(&d_new_matrix, (n + 1) * n * sizeof(cuDoubleComplex));
+    cudaMalloc(&d_new_rows, new_size * sizeof(uint64_t));
+
+    cudaMemcpy(d_new_matrix, h_new_matrix, (n + 1) * n * sizeof(cuDoubleComplex), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_new_rows, new_rows, new_size * sizeof(uint64_t), cudaMemcpyHostToDevice);
+
+    Matrix<cuDoubleComplex> modified_m(n + 1, n, d_new_matrix);
+
+    cudaMemset(permanent->typed_data(), 0, sizeof(cuDoubleComplex));
+
+    size_t n_ary_size = new_size - 1;
+    int *h_n_ary_limits = new int[n_ary_size];
+    for (size_t idx = 0; idx < n_ary_size; idx++)
+    {
+      h_n_ary_limits[idx] = new_rows[idx + 1] + 1;
+    }
+
+    uint64_t idx_max = n_ary_size > 0 ? h_n_ary_limits[0] : 0;
+    for (size_t idx = 1; idx < n_ary_size; idx++)
+    {
+      idx_max *= h_n_ary_limits[idx];
+    }
+
+    int *d_n_ary_limits;
+    cudaMalloc(&d_n_ary_limits, n_ary_size * sizeof(int));
+    cudaMemcpy(d_n_ary_limits, h_n_ary_limits, n_ary_size * sizeof(int), cudaMemcpyHostToDevice);
+
+    const int block_dim = 256;                                         // Better for most modern GPUs
+    const int grid_dim = (int)((idx_max + block_dim - 1) / block_dim); // Work-based sizing
+
+    OPermanentKernelMatrix<<<grid_dim, block_dim, 0, stream>>>(
+        modified_m, d_new_rows,
+        new_size,
+        cols.typed_data(),
+        cols.element_count(),
+        d_n_ary_limits,
+        n_ary_size,
+        idx_max,
+        reinterpret_cast<cuDoubleComplex *>(permanent->typed_data()));
+
+    delete[] h_matrix;
+    delete[] h_new_matrix;
+    delete[] new_rows;
+    cudaFree(d_new_matrix);
+    cudaFree(d_new_rows);
+  }
+  else
+  {
+    size_t n_ary_size = rows_size - 1;
+    int *h_n_ary_limits = new int[n_ary_size];
+    for (size_t idx = 0; idx < n_ary_size; idx++)
+    {
+      h_n_ary_limits[idx] = h_rows[idx + 1] + 1;
+    }
+
+    uint64_t idx_max = n_ary_size > 0 ? h_n_ary_limits[0] : 0;
+    for (size_t idx = 1; idx < n_ary_size; idx++)
+    {
+      idx_max *= h_n_ary_limits[idx];
+    }
+
+    int *d_n_ary_limits;
+    cudaMalloc(&d_n_ary_limits, n_ary_size * sizeof(int));
+    cudaMemcpy(d_n_ary_limits, h_n_ary_limits, n_ary_size * sizeof(int), cudaMemcpyHostToDevice);
+
+    cudaMemset(permanent->typed_data(), 0, sizeof(cuDoubleComplex));
+
+    const int block_dim = 256;                                         // Better for most modern GPUs
+    const int grid_dim = (int)((idx_max + block_dim - 1) / block_dim); // Work-based sizing
+
+    OPermanentKernelMatrix<<<grid_dim, block_dim, 0, stream>>>(
+        m, rows.typed_data(),
+        rows.element_count(),
+        cols.typed_data(),
+        cols.element_count(),
+        d_n_ary_limits,
+        n_ary_size,
+        idx_max,
+        reinterpret_cast<cuDoubleComplex *>(permanent->typed_data()));
+  }
+
+  delete[] h_rows;
+
+  cudaError_t last_error = cudaGetLastError();
+  if (last_error != cudaSuccess)
+  {
+    return ffi::Error::Internal(std::string("CUDA error: ") + cudaGetErrorString(last_error));
+  }
+  return ffi::Error::Success();
 }
 
 __global__ void PermanentKernelMatrix(Matrix<cuDoubleComplex> A, uint64_t *rows, size_t rows_size,
@@ -300,33 +521,6 @@ __global__ void PermanentKernelMatrix(Matrix<cuDoubleComplex> A, uint64_t *rows,
   local_result = cuCmul(local_result, make_cuDoubleComplex(scale_factor, 0.0));
 
   atAddComplex(result, local_result);
-}
-
-ffi::Error PermanentHostMatrixFromBuffer(cudaStream_t stream, ffi::Buffer<ffi::C128> A,
-                                         ffi::Buffer<ffi::U64> rows,
-                                         ffi::Buffer<ffi::U64> cols,
-                                         ffi::ResultBuffer<ffi::C128> permanent)
-{
-  const int block_dim = 128;
-  auto [total_size, n] = get_dims(A);
-  Matrix<cuDoubleComplex> m(n, n, reinterpret_cast<cuDoubleComplex *>(A.typed_data()));
-  const int grid_dim = (n * n + block_dim - 1) / block_dim;
-
-  cudaMemset(permanent->typed_data(), 0, sizeof(cuDoubleComplex));
-
-  PermanentKernelMatrix<<<grid_dim, block_dim, 0, stream>>>(
-      m, rows.typed_data(),
-      rows.element_count(),
-      cols.typed_data(),
-      cols.element_count(),
-      reinterpret_cast<cuDoubleComplex *>(permanent->typed_data()));
-
-  cudaError_t last_error = cudaGetLastError();
-  if (last_error != cudaSuccess)
-  {
-    return ffi::Error::Internal(std::string("CUDA error: ") + cudaGetErrorString(last_error));
-  }
-  return ffi::Error::Success();
 }
 
 ffi::Error PermFwdImpl(cudaStream_t stream, ffi::Buffer<ffi::C128> A, ffi::Buffer<ffi::U64> rows,
