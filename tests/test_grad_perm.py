@@ -1,4 +1,4 @@
-from permanent import permx as perm
+from permanent import perm
 import numpy as np
 import jax
 

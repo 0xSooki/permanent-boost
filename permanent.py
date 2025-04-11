@@ -25,7 +25,7 @@ else:
 
 
 @partial(jax.custom_vjp)
-def permx(A, rows, cols):
+def perm(A, rows, cols):
     if A.dtype != jnp.complex128:
         raise ValueError("Only the float32 dtype is implemented by rms_norm")
 
@@ -76,7 +76,7 @@ def perm_bwd(res, _):
         cuda=impl("dperm_bwd")
     )
 
-permx.defvjp(perm_fwd, perm_bwd)
+perm.defvjp(perm_fwd, perm_bwd)
 
 
 # @partial(jax.custom_vjp)
