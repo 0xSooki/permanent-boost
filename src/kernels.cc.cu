@@ -202,6 +202,12 @@ ffi::Error PermanentHostMatrixFromBuffer(cudaStream_t stream, ffi::Buffer<ffi::C
                                          ffi::Buffer<ffi::U64> cols,
                                          ffi::ResultBuffer<ffi::C128> permanent)
 {
+
+  cudaEvent_t start, stop;
+  cudaEventCreate(&start);
+  cudaEventCreate(&stop);
+  cudaEventRecord(start);
+
   auto [total_size, n] = get_dims(A);
 
   uint64_t *h_rows = new uint64_t[rows.element_count()];
@@ -211,7 +217,6 @@ ffi::Error PermanentHostMatrixFromBuffer(cudaStream_t stream, ffi::Buffer<ffi::C
   size_t min_idx = 0;
   uint64_t minelem = 0;
 
-  // Initialize the matrix
   Matrix<cuDoubleComplex> m(n, n, reinterpret_cast<cuDoubleComplex *>(A.typed_data()));
 
   if (rows_size > 0 && minelem != 0)
@@ -229,7 +234,6 @@ ffi::Error PermanentHostMatrixFromBuffer(cudaStream_t stream, ffi::Buffer<ffi::C
     cuDoubleComplex *h_matrix = new cuDoubleComplex[n * n];
     cudaMemcpy(h_matrix, A.typed_data(), n * n * sizeof(cuDoubleComplex), cudaMemcpyDeviceToHost);
 
-    // Create a new larger matrix
     cuDoubleComplex *h_new_matrix = new cuDoubleComplex[(n + 1) * n];
 
     for (size_t j = 0; j < n; j++)
@@ -274,8 +278,8 @@ ffi::Error PermanentHostMatrixFromBuffer(cudaStream_t stream, ffi::Buffer<ffi::C
     cudaMalloc(&d_n_ary_limits, n_ary_size * sizeof(int));
     cudaMemcpy(d_n_ary_limits, h_n_ary_limits, n_ary_size * sizeof(int), cudaMemcpyHostToDevice);
 
-    const int block_dim = 256;                                         // Better for most modern GPUs
-    const int grid_dim = (int)((idx_max + block_dim - 1) / block_dim); // Work-based sizing
+    const int block_dim = 256;
+    const int grid_dim = (int)((idx_max + block_dim - 1) / block_dim);
 
     OPermanentKernelMatrix<<<grid_dim, block_dim, 0, stream>>>(
         modified_m, d_new_rows,
@@ -314,8 +318,8 @@ ffi::Error PermanentHostMatrixFromBuffer(cudaStream_t stream, ffi::Buffer<ffi::C
 
     cudaMemset(permanent->typed_data(), 0, sizeof(cuDoubleComplex));
 
-    const int block_dim = 256;                                         // Better for most modern GPUs
-    const int grid_dim = (int)((idx_max + block_dim - 1) / block_dim); // Work-based sizing
+    const int block_dim = 256;
+    const int grid_dim = (int)((idx_max + block_dim - 1) / block_dim);
 
     OPermanentKernelMatrix<<<grid_dim, block_dim, 0, stream>>>(
         m, rows.typed_data(),
@@ -327,6 +331,12 @@ ffi::Error PermanentHostMatrixFromBuffer(cudaStream_t stream, ffi::Buffer<ffi::C
         idx_max,
         reinterpret_cast<cuDoubleComplex *>(permanent->typed_data()));
   }
+
+  cudaEventRecord(stop);
+  cudaEventSynchronize(stop);
+  float milliseconds = 0;
+  cudaEventElapsedTime(&milliseconds, start, stop);
+  printf("Kernel execution time: %f ms\n", milliseconds);
 
   delete[] h_rows;
 
