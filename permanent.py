@@ -40,7 +40,7 @@ def perm(A, rows, cols):
 
     return jax.lax.platform_dependent(
         cpu=impl("perm"),
-        cuda=impl("permm2")
+        cuda=impl("dperm")
     )
 
 

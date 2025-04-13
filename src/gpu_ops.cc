@@ -81,7 +81,7 @@ PYBIND11_MODULE(gpu_ops, m)
       py::dict registrations;
       registrations["foo_fwd"] = EncapsulateFfiHandler(FooFwd);
       registrations["foo_bwd"] = EncapsulateFfiHandler(FooBwd);
-      registrations["permm2"] = EncapsulateFfiHandler(PermanentM);
+      registrations["dperm"] = EncapsulateFfiHandler(PermanentM);
     registrations["dperm_fwd"] = EncapsulateFfiHandler(PermFwd);
      registrations["dperm_bwd"] = EncapsulateFfiHandler(PermBwd);
       return registrations; });

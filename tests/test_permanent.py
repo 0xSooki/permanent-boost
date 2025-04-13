@@ -1,7 +1,9 @@
 from permanent import perm
 import numpy as np
 from assym import assym_reduce
+import jax
 
+jax.config.update("jax_platform_name", "gpu")
 
 def test_permanent_trivial_case():
     matrix = np.array([[4.2]], dtype=np.complex128)
