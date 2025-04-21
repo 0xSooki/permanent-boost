@@ -119,22 +119,9 @@ std::pair<int64_t, int64_t> get_dims(const ffi::Buffer<T> &buffer)
 __global__ void OPermanentKernelMatrix(Matrix<cuDoubleComplex> A, uint64_t *rows, size_t rows_size,
                                        uint64_t *cols, size_t cols_size,
                                        int *n_ary_limits, size_t n_ary_size, uint64_t idx_max,
-                                       int64_t host_max_concurrent_warps, // Receive as argument
-                                       cuDoubleComplex *result)
+                                       int64_t host_max_concurrent_warps, int sum_rows, cuDoubleComplex *result)
 {
   extern __shared__ cuDoubleComplex addends[];
-
-  int sum_rows = 0;
-  for (size_t i = 0; i < rows_size; i++)
-  {
-    sum_rows += rows[i];
-  }
-
-  int sum_cols = 0;
-  for (size_t i = 0; i < cols_size; i++)
-  {
-    sum_cols += cols[i];
-  }
 
   size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
   size_t stride = blockDim.x * gridDim.x;
@@ -260,7 +247,13 @@ ffi::Error PermanentHostMatrixFromBuffer(cudaStream_t stream, ffi::Buffer<ffi::C
 
   uint64_t *h_rows = new uint64_t[rows.element_count()];
   size_t rows_size = rows.element_count();
+  int sum_rows = 0;
   cudaMemcpy(h_rows, rows.typed_data(), rows_size * sizeof(uint64_t), cudaMemcpyDeviceToHost);
+
+  for (size_t i = 0; i < rows_size; i++)
+  {
+    sum_rows += h_rows[i];
+  }
 
   size_t min_idx = 0;
   uint64_t minelem = 0;
@@ -369,7 +362,7 @@ ffi::Error PermanentHostMatrixFromBuffer(cudaStream_t stream, ffi::Buffer<ffi::C
         modified_m, d_new_rows, new_size,
         cols.typed_data(), cols.element_count(),
         d_n_ary_limits, n_ary_size, idx_max,
-        host_max_concurrent_warps, // Pass as argument
+        host_max_concurrent_warps, sum_rows,
         reinterpret_cast<cuDoubleComplex *>(permanent->typed_data()));
 
     cudaEventRecord(stop2);
@@ -418,7 +411,7 @@ ffi::Error PermanentHostMatrixFromBuffer(cudaStream_t stream, ffi::Buffer<ffi::C
         d_n_ary_limits,
         n_ary_size,
         idx_max,
-        host_max_concurrent_warps,
+        host_max_concurrent_warps, sum_rows,
         reinterpret_cast<cuDoubleComplex *>(permanent->typed_data()));
   }
   cudaDeviceSynchronize();
