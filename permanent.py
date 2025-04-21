@@ -26,8 +26,19 @@ else:
 
 @partial(jax.custom_vjp)
 def perm(A, rows, cols):
+    n, m = A.shape
+    if rows.ndim != 1 or cols.ndim != 1:
+        raise ValueError("perm: rows and cols must be 1D arrays")
+    if rows.dtype not in (jnp.uint32, jnp.uint64) or cols.dtype not in (jnp.uint32, jnp.uint64):
+        raise ValueError("perm: rows and cols must be uint32 or uint64")
+    total_in = int(rows.sum())
+    total_out = int(cols.sum())
+    if total_in != total_out:
+        raise ValueError(f"perm: sum(rows)={total_in} must equal sum(cols)={total_out}")
     if A.dtype != jnp.complex128:
-        raise ValueError("Only the float32 dtype is implemented by rms_norm")
+        raise ValueError("perm: A.dtype must be complex128")
+    if total_in == 0 and total_out == 0:
+        return 1.0
 
     out_type = jax.ShapeDtypeStruct((), A.dtype)
 
