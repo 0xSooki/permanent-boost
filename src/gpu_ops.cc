@@ -3,30 +3,7 @@
 
 namespace py = pybind11;
 
-XLA_FFI_DEFINE_HANDLER_SYMBOL(
-    FooFwd, FooFwdHost,
-    ffi::Ffi::Bind()
-        .Ctx<ffi::PlatformStream<cudaStream_t>>() // stream
-        .Arg<ffi::Buffer<ffi::C128>>()            // a
-        .Arg<ffi::Buffer<ffi::C128>>()            // b
-        .Ret<ffi::Buffer<ffi::C128>>()            // c
-        .Ret<ffi::Buffer<ffi::C128>>()            // b_plus_1
-        .Attr<size_t>("n"),
-    {xla::ffi::Traits::kCmdBufferCompatible}); // cudaGraph enabled
-
-XLA_FFI_DEFINE_HANDLER_SYMBOL(
-    FooBwd, FooBwdHost,
-    ffi::Ffi::Bind()
-        .Ctx<ffi::PlatformStream<cudaStream_t>>() // stream
-        .Arg<ffi::Buffer<ffi::F32>>()             // c_grad
-        .Arg<ffi::Buffer<ffi::F32>>()             // a
-        .Arg<ffi::Buffer<ffi::F32>>()             // b_plus_1
-        .Ret<ffi::Buffer<ffi::F32>>()             // a_grad
-        .Ret<ffi::Buffer<ffi::F32>>()             // b_grad
-        .Attr<size_t>("n"),
-    {xla::ffi::Traits::kCmdBufferCompatible}); // cudaGraph enabled
-
-XLA_FFI_DEFINE_HANDLER_SYMBOL(PermanentM, PermanentHostMatrixFromBuffer,
+XLA_FFI_DEFINE_HANDLER_SYMBOL(Perm, PermImpl,
                               ffi::Ffi::Bind()
                                   .Ctx<ffi::PlatformStream<cudaStream_t>>() // stream
                                   .Arg<ffi::Buffer<ffi::C128>>()
@@ -79,9 +56,7 @@ PYBIND11_MODULE(gpu_ops, m)
     m.def("foo", []()
           {
       py::dict registrations;
-      registrations["foo_fwd"] = EncapsulateFfiHandler(FooFwd);
-      registrations["foo_bwd"] = EncapsulateFfiHandler(FooBwd);
-      registrations["dperm"] = EncapsulateFfiHandler(PermanentM);
+      registrations["dperm"] = EncapsulateFfiHandler(Perm);
     registrations["dperm_fwd"] = EncapsulateFfiHandler(PermFwd);
      registrations["dperm_bwd"] = EncapsulateFfiHandler(PermBwd);
       return registrations; });

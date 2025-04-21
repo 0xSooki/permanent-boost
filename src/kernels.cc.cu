@@ -20,81 +20,6 @@ __device__ double atomicAdd(double *address, double val)
 }
 #endif
 
-__global__ void FooFwdKernel(const cuDoubleComplex *a, const cuDoubleComplex *b, cuDoubleComplex *c,
-                             cuDoubleComplex *b_plus_1, // intermediate output b+1
-                             size_t n)
-{
-  size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
-  size_t j = blockIdx.y * blockDim.y + threadIdx.y;
-  const size_t grid_stride = blockDim.x * gridDim.x;
-  for (size_t i = tid; i < n; i += grid_stride)
-  {
-    b_plus_1[i] = cuCadd(b[i], make_cuDoubleComplex(1.0, 0.0));
-    c[i] = cuCmul(a[i], b_plus_1[i]);
-  }
-}
-
-ffi::Error FooFwdHost(cudaStream_t stream, ffi::Buffer<ffi::C128> a,
-                      ffi::Buffer<ffi::C128> b, ffi::ResultBuffer<ffi::C128> c,
-                      ffi::ResultBuffer<ffi::C128> b_plus_1, size_t n)
-{
-  const int block_dim = 128;
-  const int grid_dim = 2;
-  // Note how we access regular Buffer data vs Result Buffer data:
-  FooFwdKernel<<<grid_dim, block_dim, /*shared_mem=*/0, stream>>>(
-      reinterpret_cast<const cuDoubleComplex *>(a.typed_data()),
-      reinterpret_cast<const cuDoubleComplex *>(b.typed_data()),
-      reinterpret_cast<cuDoubleComplex *>(c->typed_data()),
-      reinterpret_cast<cuDoubleComplex *>(b_plus_1->typed_data()),
-      n);
-
-  cudaError_t last_error = cudaGetLastError();
-  if (last_error != cudaSuccess)
-  {
-    return ffi::Error::Internal(
-        std::string("CUDA error: ") + cudaGetErrorString(last_error));
-  }
-  return ffi::Error::Success();
-}
-
-__global__ void FooBwdKernel(const float *c_grad,   // incoming gradient wrt c
-                             const float *a,        // original input a
-                             const float *b_plus_1, // intermediate output b+1
-                             float *a_grad,         // outgoing gradient wrt a
-                             float *b_grad,         // outgoing gradient wrt b
-                             size_t n)
-{
-  size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
-  const size_t grid_stride = blockDim.x * gridDim.x;
-  for (size_t i = tid; i < n; i += grid_stride)
-  {
-    a_grad[i] = c_grad[i] * b_plus_1[i];
-    b_grad[i] = c_grad[i] * a[i];
-  }
-}
-
-ffi::Error FooBwdHost(cudaStream_t stream,
-                      ffi::Buffer<ffi::F32> c_grad,
-                      ffi::Buffer<ffi::F32> a,
-                      ffi::ResultBuffer<ffi::F32> b_plus_1,
-                      ffi::ResultBuffer<ffi::F32> a_grad,
-                      ffi::ResultBuffer<ffi::F32> b_grad,
-                      size_t n)
-{
-  const int block_dim = 128;
-  const int grid_dim = 1;
-  FooBwdKernel<<<grid_dim, block_dim, /*shared_mem=*/0, stream>>>(
-      c_grad.typed_data(), a.typed_data(), b_plus_1->typed_data(),
-      a_grad->typed_data(), b_grad->typed_data(), n);
-  cudaError_t last_error = cudaGetLastError();
-  if (last_error != cudaSuccess)
-  {
-    return ffi::Error::Internal(
-        std::string("CUDA error: ") + cudaGetErrorString(last_error));
-  }
-  return ffi::Error::Success();
-}
-
 __device__ void atAddComplex(cuDoubleComplex *a, cuDoubleComplex b)
 {
   double *x = (double *)a;
@@ -427,10 +352,10 @@ cudaError_t calculatePermanent(cudaStream_t stream,
   return cudaSuccess;
 }
 
-ffi::Error PermanentHostMatrixFromBuffer(cudaStream_t stream, ffi::Buffer<ffi::C128> A,
-                                         ffi::Buffer<ffi::U64> rows,
-                                         ffi::Buffer<ffi::U64> cols,
-                                         ffi::ResultBuffer<ffi::C128> permanent)
+ffi::Error PermImpl(cudaStream_t stream, ffi::Buffer<ffi::C128> A,
+                    ffi::Buffer<ffi::U64> rows,
+                    ffi::Buffer<ffi::U64> cols,
+                    ffi::ResultBuffer<ffi::C128> permanent)
 {
   auto [total_size, n] = get_dims(A);
   size_t rows_size = rows.element_count();
@@ -617,7 +542,7 @@ ffi::Error PermFwdImpl(cudaStream_t stream, ffi::Buffer<ffi::C128> A, ffi::Buffe
                        ffi::ResultBuffer<ffi::C128> y,
                        ffi::ResultBuffer<ffi::C128> res)
 {
-  ffi::Error perm_err = PermanentHostMatrixFromBuffer(stream, A, rows, cols, y);
+  ffi::Error perm_err = PermImpl(stream, A, rows, cols, y);
 
   cudaError_t cuda_err = cudaMemcpyAsync(
       reinterpret_cast<cuDoubleComplex *>(res->typed_data()),
