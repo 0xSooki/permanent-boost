@@ -2,14 +2,74 @@ from permanent import perm
 import numpy as np
 from assym import assym_reduce
 import jax
+import pytest
 
-jax.config.update("jax_platform_name", "gpu")
+jax.config.update("jax_platform_name", "cpu")
+
+def test_permanent_empty_matrix():
+    matrix = np.empty((0, 0), dtype=np.complex128)
+    input = output = np.zeros(0, dtype=np.uint64)
+    assert np.isclose(perm(matrix, input, output), 1.0)
+
+def test_permanent_single_zero_entry():
+    matrix = np.array([[0]], dtype=np.complex128)
+    input = output = np.ones(1, dtype=np.uint64)
+    assert np.isclose(perm(matrix, input, output), 0.0)
+
+def test_permanent_row_col_mismatch():
+    matrix = np.eye(2, dtype=np.complex128)
+    input = np.ones(2, dtype=np.uint64)
+    output = np.ones(3, dtype=np.uint64)
+    with pytest.raises(Exception):
+        perm(matrix, input, output)
+
+def test_permanent_negative_entries():
+    matrix = np.array([[1, -2], [-3, 4]], dtype=np.complex128)
+    input = output = np.ones(2, dtype=np.uint64)
+    expected = 1*4 + (-2)*(-3)  # 4 + 6 = 10
+    assert np.isclose(perm(matrix, input, output), 10.0)
+
+def test_permanent_large_values():
+    matrix = np.full((3, 3), 1e10, dtype=np.complex128)
+    input = output = np.ones(3, dtype=np.uint64)
+    result = perm(matrix, input, output)
+    assert np.isfinite(result)
+
+def test_permanent_high_repetition():
+    matrix = np.array([[2, 3], [4, 5]], dtype=np.complex128)
+    input = np.array([3, 0], dtype=np.uint64)
+    output = np.array([2, 1], dtype=np.uint64)
+    # Should not raise and should return a finite number
+    result = perm(matrix, input, output)
+    assert np.isfinite(result)
+
+def test_permanent_all_zeros_input_output():
+    matrix = np.random.rand(4, 4) + 1j * np.random.rand(4, 4)
+    input = output = np.zeros(4, dtype=np.uint64)
+    assert np.isclose(perm(matrix, input, output), 1.0)
+
+def test_permanent_large_matrix_small_repetition():
+    matrix = np.eye(8, dtype=np.complex128)
+    input = output = np.ones(8, dtype=np.uint64)
+    result = perm(matrix, input, output)
+    assert np.isclose(result, 1.0)
+
+def test_permanent_real_matrix():
+    matrix = np.array([[1, 2], [3, 4]], dtype=np.float64)
+    input = output = np.ones(2, dtype=np.uint64)
+    with pytest.raises(Exception):
+        perm(matrix, input, output)
+
+def test_permanent_complex_conjugate_symmetry():
+    matrix = np.array([[1+1j, 2-1j], [3+0j, 4+2j]], dtype=np.complex128)
+    input = output = np.ones(2, dtype=np.uint64)
+    result = perm(matrix, input, output)
+    result_conj = perm(np.conj(matrix), input, output)
+    assert np.isclose(result_conj, np.conj(result))
 
 def test_permanent_trivial_case():
     matrix = np.array([[4.2]], dtype=np.complex128)
-
     input = output = np.ones(1, dtype=np.uint64)
-
     assert np.isclose(perm(matrix, input, output), 4.2)
 
 
@@ -104,7 +164,6 @@ def test_permanent_no_repetition():
 def test_permanent_2_by_2_asymmetric():
     input = np.array([2, 0], dtype=np.uint64)
     output = np.array([0, 2], dtype=np.uint64)
-
     interferometer = np.array([[1, 1j], [1, -1j]], dtype=np.complex128) / np.sqrt(2)
     assert np.isclose(perm(interferometer, input, output), -1)
 
