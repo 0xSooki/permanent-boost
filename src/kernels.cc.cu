@@ -43,7 +43,7 @@ std::pair<int64_t, int64_t> get_dims(const ffi::Buffer<T> &buffer)
 
 __global__ void PermanentKernelMatrix(Matrix<cuDoubleComplex> A, uint64_t *rows, size_t rows_size,
                                       uint64_t *cols, size_t cols_size,
-                                      int *n_ary_limits, size_t n_ary_size, uint64_t idx_max,
+                                      int *h_n_ary_limits, size_t n_ary_size, uint64_t idx_max,
                                       int64_t host_max_concurrent_warps, int sum_rows, cuDoubleComplex *result)
 {
   extern __shared__ cuDoubleComplex addends[];
@@ -53,7 +53,6 @@ __global__ void PermanentKernelMatrix(Matrix<cuDoubleComplex> A, uint64_t *rows,
 
   cuDoubleComplex local_result = make_cuDoubleComplex(0.0, 0.0);
 
-  unsigned int nthreads = 32;
   int64_t concurrency = min(host_max_concurrent_warps, static_cast<int64_t>(idx_max));
 
   for (uint64_t job_idx = tid; job_idx < concurrency; job_idx += stride)
@@ -66,7 +65,7 @@ __global__ void PermanentKernelMatrix(Matrix<cuDoubleComplex> A, uint64_t *rows,
       offset_max = idx_max - 1;
     }
 
-    n_aryGrayCodeCounter gcode_counter(n_ary_limits, n_ary_size, initial_offset);
+    n_aryGrayCodeCounter gcode_counter(h_n_ary_limits, n_ary_size, initial_offset);
     gcode_counter.set_offset_max(offset_max);
 
     int *gcode = gcode_counter.get();
@@ -114,8 +113,8 @@ __global__ void PermanentKernelMatrix(Matrix<cuDoubleComplex> A, uint64_t *rows,
 
     for (int64_t idx = initial_offset + 1; idx < offset_max + 1; idx++)
     {
-      int changed_index, value_prev, value;
-      if (gcode_counter.next(changed_index, value_prev, value))
+      int changed_index, prev_value, value;
+      if (gcode_counter.next(changed_index, prev_value, value))
       {
         break;
       }
@@ -126,7 +125,7 @@ __global__ void PermanentKernelMatrix(Matrix<cuDoubleComplex> A, uint64_t *rows,
       cuDoubleComplex colsum_prod = make_cuDoubleComplex(parity, 0.0);
       for (size_t col_idx = 0; col_idx < cols_size; col_idx++)
       {
-        if (value_prev < value)
+        if (prev_value < value)
         {
           colsum[col_idx] = cuCsub(colsum[col_idx], cuCmul(make_cuDoubleComplex(2.0, 0.0), A(row_offset, col_idx)));
         }
@@ -143,9 +142,9 @@ __global__ void PermanentKernelMatrix(Matrix<cuDoubleComplex> A, uint64_t *rows,
 
       int row_mult_current = rows[changed_index + 1];
       binomial_coeff =
-          value < value_prev
-              ? binomial_coeff * value_prev / (row_mult_current - value)
-              : binomial_coeff * (row_mult_current - value_prev) / value;
+          value < prev_value
+              ? binomial_coeff * prev_value / (row_mult_current - value)
+              : binomial_coeff * (row_mult_current - prev_value) / value;
 
       colsum_prod = cuCmul(colsum_prod, make_cuDoubleComplex((double)binomial_coeff, 0.0));
       local_result = cuCadd(local_result, colsum_prod);
@@ -182,18 +181,14 @@ cudaError_t calculatePermanent(cudaStream_t stream,
     sum_cols += c;
 
   size_t min_idx = 0;
-  uint64_t minelem = 0;
-  bool found_min = false;
-  for (size_t i = 0; i < rows_size; i++)
+  int minelem = 0;
+
+  for (int i = 0; i < h_rows.size(); i++)
   {
-    if (h_rows[i] > 0)
+    if (minelem == 0 || (h_rows[i] < minelem && h_rows[i] != 0))
     {
-      if (!found_min || h_rows[i] < minelem)
-      {
-        minelem = h_rows[i];
-        min_idx = i;
-        found_min = true;
-      }
+      minelem = h_rows[i];
+      min_idx = i;
     }
   }
 
@@ -208,7 +203,7 @@ cudaError_t calculatePermanent(cudaStream_t stream,
   if (cuda_err != cudaSuccess)
     return cuda_err;
 
-  if (rows_size > 0 && found_min)
+  if (h_rows.size() > 0 && minelem != 0)
   {
     size_t new_rows_size = rows_size + 1;
     std::vector<uint64_t> h_new_rows(new_rows_size);
@@ -219,21 +214,21 @@ cudaError_t calculatePermanent(cudaStream_t stream,
     }
     h_new_rows[1 + min_idx] -= 1;
 
-    std::vector<cuDoubleComplex> h_orig_matrix(n * n);
-    cuda_err = cudaMemcpy(h_orig_matrix.data(), A_data, n * n * sizeof(cuDoubleComplex), cudaMemcpyDeviceToHost);
+    Matrix<cuDoubleComplex> h_orig_matrix(n, n);
+    cuda_err = cudaMemcpy(h_orig_matrix.data, A_data, n * n * sizeof(cuDoubleComplex), cudaMemcpyDeviceToHost);
     if (cuda_err != cudaSuccess)
       return cuda_err;
 
-    std::vector<cuDoubleComplex> h_new_matrix((n + 1) * n);
+    Matrix<cuDoubleComplex> mtx_(n + 1, n);
     for (size_t j = 0; j < n; j++)
     {
-      h_new_matrix[j] = h_orig_matrix[min_idx * n + j];
+      mtx_[j] = h_orig_matrix(min_idx, j);
     }
     for (size_t i = 0; i < n; i++)
     {
       for (size_t j = 0; j < n; j++)
       {
-        h_new_matrix[(i + 1) * n + j] = h_orig_matrix[i * n + j];
+        mtx_(i + 1, j) = h_orig_matrix(i, j);
       }
     }
 
@@ -253,7 +248,7 @@ cudaError_t calculatePermanent(cudaStream_t stream,
       return cuda_err;
     }
 
-    cuda_err = cudaMemcpyAsync(d_new_matrix, h_new_matrix.data(), (n + 1) * n * sizeof(cuDoubleComplex), cudaMemcpyHostToDevice, stream);
+    cuda_err = cudaMemcpyAsync(d_new_matrix, mtx_.data, (n + 1) * n * sizeof(cuDoubleComplex), cudaMemcpyHostToDevice, stream);
     if (cuda_err != cudaSuccess)
     {
       cudaFree(d_new_matrix);
@@ -272,33 +267,16 @@ cudaError_t calculatePermanent(cudaStream_t stream,
 
     size_t n_ary_size = new_rows_size - 1;
     std::vector<int> h_n_ary_limits(n_ary_size);
-    uint64_t idx_max = 1;
-    bool non_zero_limit_found = false;
-    for (size_t idx = 0; idx < n_ary_size; idx++)
+    for (size_t i = 0; i < n_ary_size; i++)
     {
-      h_n_ary_limits[idx] = h_new_rows[idx + 1] + 1;
-      if (h_n_ary_limits[idx] > 0)
-      {
-        if (!non_zero_limit_found)
-        {
-          idx_max = h_n_ary_limits[idx];
-          non_zero_limit_found = true;
-        }
-        else
-        {
-          idx_max *= h_n_ary_limits[idx];
-        }
-      }
-      if (h_n_ary_limits[idx] <= 0)
-      {
-        idx_max = 0;
-        break;
-      }
+      h_n_ary_limits[i] = h_new_rows[i + 1] + 1;
     }
-    if (!non_zero_limit_found && n_ary_size > 0)
-      idx_max = 0;
-    if (n_ary_size == 0)
-      idx_max = 0;
+
+    uint64_t idx_max = h_n_ary_limits[0];
+    for (size_t i = 1; i < n_ary_size; i++)
+    {
+      idx_max *= h_n_ary_limits[i];
+    }
 
     cuda_err = cudaMalloc(&d_n_ary_limits, n_ary_size * sizeof(int));
     if (cuda_err != cudaSuccess)
@@ -307,6 +285,7 @@ cudaError_t calculatePermanent(cudaStream_t stream,
       cudaFree(d_new_rows);
       return cuda_err;
     }
+
     cuda_err = cudaMemcpyAsync(d_n_ary_limits, h_n_ary_limits.data(), n_ary_size * sizeof(int), cudaMemcpyHostToDevice, stream);
     if (cuda_err != cudaSuccess)
     {
@@ -337,7 +316,7 @@ cudaError_t calculatePermanent(cudaStream_t stream,
 
     cudaError_t free_err = cudaFree(d_new_matrix);
     if (cuda_err == cudaSuccess && free_err != cudaSuccess)
-      cuda_err = free_err; // Keep first error
+      cuda_err = free_err;
     free_err = cudaFree(d_new_rows);
     if (cuda_err == cudaSuccess && free_err != cudaSuccess)
       cuda_err = free_err;
