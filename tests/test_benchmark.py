@@ -8,8 +8,7 @@ from scipy.stats import unitary_group
 import time
 import jax.numpy as jnp
 
-n=10
-
+n=13
 
 def generate_random_unitary(n):
     """Generate a random n x n unitary matrix."""
@@ -24,7 +23,7 @@ def generate_multiplicity_vectors(n):
     rows = np.ones(n, dtype=np.uint64)
     cols = np.ones(n, dtype=np.uint64)
     rows = 3*rows
-    cols = 2*cols
+    cols = 3*cols
     return rows, cols
 
 matrix = generate_random_unitary(n)
@@ -36,8 +35,6 @@ def test_perm_30x30_boost_cpu():
     try:
         jax.config.update('jax_platform_name', 'cpu')
         with jax.default_device(jax.devices('cpu')[0]):
-            matrix = generate_random_unitary(n)
-            rows, cols = generate_multiplicity_vectors(n)
             start_time = time.time()
             print(perm(matrix, rows, cols))
             end_time = time.time()

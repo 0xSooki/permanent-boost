@@ -4,8 +4,6 @@ from assym import assym_reduce
 import jax
 import pytest
 
-jax.config.update("jax_platform_name", "cpu")
-
 def test_permanent_empty_matrix():
     matrix = np.empty((0, 0), dtype=np.complex128)
     input = output = np.zeros(0, dtype=np.uint64)
