@@ -129,7 +129,7 @@ std::complex<double> permanent(Matrix<std::complex<double>> &A,
 
   // determine the concurrency of the calculation
   unsigned int nthreads = std::thread::hardware_concurrency();
-  int64_t concurrency = static_cast<int64_t>(nthreads) * 4;
+  int64_t concurrency = static_cast<int64_t>(nthreads) * 5;
   concurrency = concurrency < idx_max ? concurrency : static_cast<int64_t>(idx_max);
 
   std::vector<scalar_type> thread_results(concurrency, scalar_type(0.0, 0.0));
@@ -203,8 +203,8 @@ std::complex<double> permanent(Matrix<std::complex<double>> &A,
     // iterate over gray codes to calculate permanent addends
     for (int64_t idx = initial_offset + 1; idx < offset_max + 1; idx++)
     {
-      int changed_index, value_prev, value;
-      if (gcode_counter.next(changed_index, value_prev, value))
+      int changed_index, prev_value, value;
+      if (gcode_counter.next(changed_index, prev_value, value))
       {
         break;
       }
@@ -217,7 +217,7 @@ std::complex<double> permanent(Matrix<std::complex<double>> &A,
       scalar_type colsum_prod(static_cast<precision_type>(parity), static_cast<precision_type>(0.0));
       for (size_t col_idx = 0; col_idx < cols.size(); col_idx++)
       {
-        if (value_prev < value)
+        if (prev_value < value)
         {
           colsum[col_idx] -= mtx_data[col_idx];
         }
@@ -232,12 +232,11 @@ std::complex<double> permanent(Matrix<std::complex<double>> &A,
         }
       }
 
-      // update binomial factor
       int row_mult_current = rows[changed_index + 1];
       binomial_coeff =
-          value < value_prev
-              ? binomial_coeff * value_prev / (row_mult_current - value)
-              : binomial_coeff * (row_mult_current - value_prev) / value;
+          value < prev_value
+              ? binomial_coeff * prev_value / (row_mult_current - value)
+              : binomial_coeff * (row_mult_current - prev_value) / value;
 
       addend_loc += colsum_prod * static_cast<precision_type>(binomial_coeff);
     }
@@ -246,16 +245,16 @@ std::complex<double> permanent(Matrix<std::complex<double>> &A,
       colsum[n - 1].~scalar_type();
   }
 
-  // Combine all thread results - we need a serial reduction
+  // combine all thread results
   scalar_type permanent(0.0, 0.0);
   for (const auto &result : thread_results)
   {
     permanent += result;
   }
 
+  // scaling factor
   permanent /= static_cast<precision_type>(ldexp(1.0, sum(rows) - 1));
 
-  // clean up the allocated n_ary_limits array
   delete[] n_ary_limits;
 
   return permanent;
