@@ -84,9 +84,8 @@ std::complex<double> permanent(Matrix<std::complex<double>> &A,
 
   if (sum_rows != sum_cols)
   {
-    std::string error("BBFGPermanentCalculatorRepeated_Tasks::calculate:  "
-                      "Number of input and output states should be equal");
-    throw error;
+    std::cerr << "Error: The sum of rows and columns must be equal." << std::endl;
+    return std::complex<double>(0.0, 0.0);
   }
 
   if (A.rows == 0 || A.cols == 0 || sum_rows == 0 || sum_cols == 0)
@@ -268,14 +267,12 @@ Matrix<std::complex<double>> grad_perm(Matrix<std::complex<double>> &A,
 
   Matrix<std::complex<double>> perm_grad(n, n);
 
+#pragma omp parallel for collapse(2)
   for (int i = 0; i < n; ++i)
   {
-    if (rows[i] == 0)
-      continue;
-
     for (int j = 0; j < n; ++j)
     {
-      if (cols[j] == 0)
+      if (rows[i] == 0 || cols[j] == 0)
         continue;
 
       std::vector<int> grad_rows(rows);
