@@ -3,14 +3,11 @@ import jax
 import pytest
 
 def pytest_addoption(parser):
-    parser.addoption("--gpu", action="store_true", help="Run tests using GPU backend")
-    parser.addoption("--cpu", action="store_true", help="Run tests using CPU backend")
+    parser.addoption("--platform", action="store", default="cpu", help="Choose platform: cpu or gpu")
 
 def pytest_configure(config):
-    if config.getoption("--gpu"):
-        jax.config.update("jax_platform_name", "gpu")
-    elif config.getoption("--cpu"):
-        jax.config.update("jax_platform_name", "cpu")
+    platform = config.getoption("--platform")
+    jax.config.update("jax_platform_name", platform)
 
 @pytest.fixture(scope="session", autouse=True)
 def register_ffi_targets():
