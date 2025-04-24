@@ -150,3 +150,5 @@ lib64/
 share/
 include/
 .vscode/
+venv/
+lib/
