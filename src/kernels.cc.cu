@@ -46,8 +46,6 @@ __global__ void PermanentKernelMatrix(Matrix<cuDoubleComplex> A, uint64_t *rows,
                                       int *h_n_ary_limits, size_t n_ary_size, uint64_t idx_max,
                                       int64_t host_max_concurrent_warps, int sum_rows, cuDoubleComplex *result)
 {
-  extern __shared__ cuDoubleComplex addends[];
-
   size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
   size_t stride = blockDim.x * gridDim.x;
 
@@ -301,11 +299,10 @@ cudaError_t calculatePermanent(cudaStream_t stream,
     int max_concurrent_blocks_gpu = props.multiProcessorCount * max_blocks_per_sm;
     int min_blocks_for_work = (idx_max == 0) ? 0 : (int)((idx_max + block_dim - 1) / block_dim);
     const int grid_dim = std::min(max_concurrent_blocks_gpu, min_blocks_for_work);
-    size_t shared_mem_size = block_dim * sizeof(cuDoubleComplex);
 
     if (grid_dim > 0)
     {
-      PermanentKernelMatrix<<<grid_dim, block_dim, shared_mem_size, stream>>>(
+      PermanentKernelMatrix<<<grid_dim, block_dim, 0, stream>>>(
           modified_m, d_new_rows, new_rows_size,
           cols_data, cols_size,
           d_n_ary_limits, n_ary_size, idx_max,
