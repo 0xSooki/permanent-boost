@@ -80,15 +80,15 @@ public:
     }
 
     // copy limits
-    for (size_t idx = 0; idx < num_digits; idx++)
+    for (size_t i = 0; i < num_digits; i++)
     {
-      n_ary_limits[idx] = limits[idx];
+      n_ary_limits[i] = limits[i];
     }
 
     offset_max = n_ary_limits[0];
-    for (size_t idx = 1; idx < num_digits; idx++)
+    for (size_t i = 1; i < num_digits; i++)
     {
-      offset_max *= n_ary_limits[idx];
+      offset_max *= n_ary_limits[i];
     }
     offset_max--;
     offset = 0;
@@ -113,15 +113,15 @@ public:
       return;
     }
 
-    for (size_t idx = 0; idx < num_digits; idx++)
+    for (size_t i = 0; i < num_digits; i++)
     {
-      n_ary_limits[idx] = limits[idx];
+      n_ary_limits[i] = limits[i];
     }
 
     offset_max = n_ary_limits[0];
-    for (size_t idx = 1; idx < num_digits; idx++)
+    for (size_t i = 1; i < num_digits; i++)
     {
-      offset_max *= n_ary_limits[idx];
+      offset_max *= n_ary_limits[i];
     }
     offset_max--;
     offset = initial_offset;
@@ -159,18 +159,18 @@ public:
 
     // generate counter chain
     int temp_offset = static_cast<int>(initial_offset);
-    for (size_t idx = 0; idx < num_digits; idx++)
+    for (size_t i = 0; i < num_digits; i++)
     {
-      counter_chain[idx] = temp_offset % n_ary_limits[idx];
-      temp_offset /= n_ary_limits[idx];
+      counter_chain[i] = temp_offset % n_ary_limits[i];
+      temp_offset /= n_ary_limits[i];
     }
 
     // determine the initial gray code corresponding to the given offset
     int parity = 0;
-    for (int jdx = static_cast<int>(num_digits) - 1; jdx >= 0; jdx--)
+    for (int i = static_cast<int>(num_digits) - 1; i >= 0; i--)
     {
-      int code = parity ? n_ary_limits[jdx] - 1 - counter_chain[jdx] : counter_chain[jdx];
-      gray_code[jdx] = code;
+      int code = parity ? n_ary_limits[i] - 1 - counter_chain[i] : counter_chain[i];
+      gray_code[i] = code;
       parity ^= (code & 1);
     }
   }
@@ -239,17 +239,17 @@ public:
 
     int parity = 0;
     // iterate over gray code in reverse order to determine the updated value
-    for (int jdx = static_cast<int>(num_digits) - 1; jdx >= 0; jdx--)
+    for (int i = static_cast<int>(num_digits) - 1; i >= 0; i--)
     {
-      int gray_code_new_val = parity ? n_ary_limits[jdx] - 1 - counter_chain[jdx]
-                                     : counter_chain[jdx];
+      int gray_code_new_val = parity ? n_ary_limits[i] - 1 - counter_chain[i]
+                                     : counter_chain[i];
       parity ^= (gray_code_new_val & 1);
-      if (gray_code_new_val != gray_code[jdx])
+      if (gray_code_new_val != gray_code[i])
       {
-        value_prev = gray_code[jdx];
+        value_prev = gray_code[i];
         value = gray_code_new_val;
-        gray_code[jdx] = gray_code_new_val;
-        changed_index = jdx;
+        gray_code[i] = gray_code_new_val;
+        changed_index = i;
         break;
       }
     }
