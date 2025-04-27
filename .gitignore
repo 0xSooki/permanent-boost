@@ -146,8 +146,9 @@ _skbuild/
 CMakeFiles/
 .DS_Store
 venv/
-bin/
-share/
 lib/
-include/
+bin/
 lib64/
+share/
+include/
+.vscode/
