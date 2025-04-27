@@ -1,5 +1,10 @@
 [build-system]
-requires = ["scikit-build-core>=0.3.3", "pybind11", "jax>=0.4.29"]
+requires = [
+  "scikit-build-core>=0.3.3",
+  "pybind11",
+  "jax>=0.4.29",
+  "jaxlib>=0.4.29",
+]
 build-backend = "scikit_build_core.build"
 
 
