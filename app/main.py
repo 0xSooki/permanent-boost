@@ -35,6 +35,7 @@ class PermanentCalculatorUI(QMainWindow):
         self.matrix_data = None
         self.rows = None
         self.cols = None
+        self.gradient_data = None
 
         # menu bar
         menu_bar = QMenuBar(self)
@@ -48,6 +49,10 @@ class PermanentCalculatorUI(QMainWindow):
 
         exit_action = file_menu.addAction("Exit")
         exit_action.triggered.connect(self.close)
+
+        self.save_gradient_action = file_menu.addAction("Save Gradient (.npy)")
+        self.save_gradient_action.triggered.connect(self.save_gradient)
+        self.save_gradient_action.setEnabled(False)
 
         self.central_widget = QWidget()
         self.main_layout = QVBoxLayout()
@@ -113,7 +118,6 @@ class PermanentCalculatorUI(QMainWindow):
                         raise TypeError(
                             "Loaded .npy file does not contain a NumPy array."
                         )
-                    # Ensure it's 2D
                     if data.ndim != 2:
                         raise ValueError(
                             f"Expected a 2D array from .npy file, but got shape {data.shape}"
@@ -147,12 +151,39 @@ class PermanentCalculatorUI(QMainWindow):
                 )
 
                 self.calculate_button.setEnabled(True)
+                self.gradient_data = None
 
             except Exception as e:
                 self.status_label.setText(f"Error importing file: {str(e)}")
                 self.statusBar.showMessage("Error importing file")
                 self.clear_data()
                 self.calculate_button.setEnabled(False)
+                self.save_gradient_action.setEnabled(False)
+
+    def save_gradient(self):
+        if self.gradient_data is None:
+            self.statusBar.showMessage("No gradient data to save.")
+            return
+
+        options = QFileDialog.Options()
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Gradient",
+            "",
+            "NumPy Files (*.npy);;All Files (*)",
+            options=options,
+        )
+
+        if file_path:
+            if not file_path.endswith(".npy"):
+                file_path += ".npy"  # Ensure .npy extension
+            try:
+                np.save(file_path, self.gradient_data)
+                self.statusBar.showMessage(
+                    f"Gradient saved successfully to {file_path}"
+                )
+            except Exception as e:
+                self.statusBar.showMessage(f"Error saving gradient: {str(e)}")
 
     def calculate(self):
         if self.matrix_data is None:
@@ -167,6 +198,7 @@ class PermanentCalculatorUI(QMainWindow):
             permanent_value = perm(jax_matrix, jax_rows, jax_cols)
 
             gradient = jax.grad(perm, holomorphic=True)(jax_matrix, jax_rows, jax_cols)
+            self.gradient_data = np.array(gradient)
 
             results_text = f"Permanent Value:\n{permanent_value}\n\n"
             results_text += f"Gradient Shape: {gradient.shape}\n\n"
@@ -174,6 +206,7 @@ class PermanentCalculatorUI(QMainWindow):
 
             self.results_display.setText(results_text)
             self.statusBar.showMessage("Calculation completed")
+            self.save_gradient_action.setEnabled(True)
 
         except Exception as e:
             self.results_display.setText(f"Error calculating permanent: {str(e)}")
@@ -185,6 +218,7 @@ class PermanentCalculatorUI(QMainWindow):
         self.cols = None
         self.matrix_display.clear()
         self.results_display.clear()
+        self.save_gradient_action.setEnabled(False)
         self.status_label.setText("Import a file to calculate the permanent")
         self.statusBar.showMessage("Ready")
         self.calculate_button.setEnabled(False)
