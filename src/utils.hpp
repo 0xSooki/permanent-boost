@@ -26,7 +26,6 @@ int_type
 binomialCoeffTemplated(int n, int k)
 {
   std::vector<int_type> C(k + 1);
-  memset(C, 0, sizeof(C));
   C[0] = 1;
   for (int i = 1; i <= n; i++)
   {
