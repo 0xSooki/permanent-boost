@@ -7,4 +7,6 @@ try:
 except ImportError:
     pass
 
-__all__ = ["__doc__", "__version__"]
+from .permanent import perm
+
+__all__ = ["__doc__", "__version__", "perm"]

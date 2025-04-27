@@ -8,7 +8,7 @@ from utils import (
     generate_multiplicity_vectors,
 )
 
-from permanent import perm
+from sooki import perm
 
 n = 10
 

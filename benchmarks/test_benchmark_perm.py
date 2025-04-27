@@ -4,7 +4,7 @@ import numpy as np
 from scipy.stats import unitary_group
 import jax
 
-from permanent import perm
+from sooki import perm
 from piquasso._math.permanent import permanent
 
 from utils import (

@@ -24,7 +24,7 @@ import os
 import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from permanent import perm
+from sooki import perm
 
 
 class PermanentCalculatorUI(QMainWindow):

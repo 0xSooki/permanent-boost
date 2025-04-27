@@ -1,4 +1,4 @@
-from permanent import perm
+from sooki import perm
 import numpy as np
 import jax
 

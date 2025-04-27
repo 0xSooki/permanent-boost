@@ -1,7 +1,6 @@
-from permanent import perm
+from sooki import perm
 import numpy as np
 from assym import assym_reduce
-import jax
 import pytest
 
 
