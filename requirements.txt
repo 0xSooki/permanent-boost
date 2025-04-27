@@ -1,6 +1,5 @@
 jax
 pybind11
 scikit-build-core
-tbb
 pytest
 numpy
