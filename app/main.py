@@ -47,8 +47,8 @@ class PermanentCalculatorUI(QMainWindow):
         import_action = file_menu.addAction("Import File")
         import_action.triggered.connect(self.import_file)
 
-        exit_action = file_menu.addAction("Exit")
-        exit_action.triggered.connect(self.close)
+        # exit_action = file_menu.addAction("Exit")
+        # exit_action.triggered.connect(self.close)
 
         self.save_gradient_action = file_menu.addAction("Save Gradient (.npy)")
         self.save_gradient_action.triggered.connect(self.save_gradient)
