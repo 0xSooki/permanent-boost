@@ -79,9 +79,9 @@ HOST_DEVICE
  * @param k The second parameter of the binomial coefficient.
  * @return The binomial coefficient of n and k.
  */
-inline __int128 binomialCoeffInt128(int n, int k)
+inline int64_t binomialCoeffInt128(int n, int k)
 {
-  return binomialCoeffTemplated<__int128>(n, k);
+  return binomialCoeffTemplated<int64_t>(n, k);
 }
 
 /**

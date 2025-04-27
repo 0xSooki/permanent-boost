@@ -52,6 +52,7 @@ jobs:
           CIBW_BUILD: "cp310-* cp311-* cp312-*"
           MACOSX_DEPLOYMENT_TARGET: ${{ matrix.os == 'macos-14' && '14.0' || '11.0' }}
           CIBW_ARCHS_WINDOWS: "AMD64"
+          CIBW_BEFORE_ALL_LINUX: "yum install -y openblas-devel"
       - name: Upload wheels as artifact
         uses: actions/upload-artifact@v4
         with:
