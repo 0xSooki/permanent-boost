@@ -29,6 +29,10 @@ jobs:
         run: |
           brew install cmake libomp
 
+      - name: Install uv (macOS only)
+        if: runner.os == 'macOS'
+        run: python -m pip install uv
+
       - name: Install system dependencies (Windows)
         if: runner.os == 'Windows'
         run: |
