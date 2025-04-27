@@ -1,4 +1,4 @@
-jax==0.5.0
+jax
 pybind11
 scikit-build-core
 tbb
