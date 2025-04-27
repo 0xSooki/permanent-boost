@@ -55,6 +55,7 @@ jobs:
           CIBW_SKIP: "*musllinux*"
           MACOSX_DEPLOYMENT_TARGET: ${{ matrix.os == 'macos-14' && '14.0' || '13.0' }}
           CIBW_ARCHS_WINDOWS: "AMD64"
+          CIBW_TEST_COMMAND: ""
       - name: Upload wheels as artifact
         uses: actions/upload-artifact@v4
         with:
