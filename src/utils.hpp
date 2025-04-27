@@ -25,8 +25,7 @@ template <typename int_type>
 int_type
 binomialCoeffTemplated(int n, int k)
 {
-  int_type C[k + 1];
-  memset(C, 0, sizeof(C));
+  std::vector<int_type> C(k + 1);
   C[0] = 1;
   for (int i = 1; i <= n; i++)
   {
@@ -79,9 +78,9 @@ HOST_DEVICE
  * @param k The second parameter of the binomial coefficient.
  * @return The binomial coefficient of n and k.
  */
-inline __int128 binomialCoeffInt128(int n, int k)
+inline int64_t binomialCoeffInt128(int n, int k)
 {
-  return binomialCoeffTemplated<__int128>(n, k);
+  return binomialCoeffTemplated<int64_t>(n, k);
 }
 
 /**

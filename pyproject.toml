@@ -1,5 +1,10 @@
 [build-system]
-requires = ["scikit-build-core>=0.3.3", "pybind11", "jax>=0.4.31"]
+requires = [
+  "scikit-build-core>=0.3.3",
+  "pybind11",
+  "jax>=0.4.29",
+  "jaxlib>=0.4.29",
+]
 build-backend = "scikit_build_core.build"
 
 
@@ -9,15 +14,11 @@ version = "0.0.1"
 description = "Permanent calculator package (with pybind11)"
 readme = "README.md"
 authors = [{ name = "sooki", email = "0xSooki@protonmail.com" }]
-requires-python = ">=3.7"
+requires-python = ">=3.10"
 dependencies = ["jax"]
 classifiers = [
   "Development Status :: 4 - Beta",
   "License :: OSI Approved :: MIT License",
-  "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.7",
-  "Programming Language :: Python :: 3.8",
-  "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",

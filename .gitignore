@@ -145,10 +145,18 @@ _skbuild/
 
 CMakeFiles/
 .DS_Store
+venv/
+lib/
 bin/
 lib64/
 share/
 include/
 .vscode/
+=========
 venv/
+bin/
+share/
 lib/
+include/
+lib64/
+>>>>>>>>> Temporary merge branch 2

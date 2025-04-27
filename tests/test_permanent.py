@@ -1,18 +1,20 @@
-from permanent import perm
+from sooki import perm
 import numpy as np
 from assym import assym_reduce
-import jax
 import pytest
+
 
 def test_permanent_empty_matrix():
     matrix = np.empty((0, 0), dtype=np.complex128)
     input = output = np.zeros(0, dtype=np.uint64)
     assert np.isclose(perm(matrix, input, output), 1.0)
 
+
 def test_permanent_single_zero_entry():
     matrix = np.array([[0]], dtype=np.complex128)
     input = output = np.ones(1, dtype=np.uint64)
     assert np.isclose(perm(matrix, input, output), 0.0)
+
 
 def test_permanent_row_col_mismatch():
     matrix = np.eye(2, dtype=np.complex128)
@@ -21,17 +23,20 @@ def test_permanent_row_col_mismatch():
     with pytest.raises(Exception):
         perm(matrix, input, output)
 
+
 def test_permanent_negative_entries():
     matrix = np.array([[1, -2], [-3, 4]], dtype=np.complex128)
     input = output = np.ones(2, dtype=np.uint64)
-    expected = 1*4 + (-2)*(-3)  # 4 + 6 = 10
+    expected = 1 * 4 + (-2) * (-3)  # 4 + 6 = 10
     assert np.isclose(perm(matrix, input, output), 10.0)
+
 
 def test_permanent_large_values():
     matrix = np.full((3, 3), 1e10, dtype=np.complex128)
     input = output = np.ones(3, dtype=np.uint64)
     result = perm(matrix, input, output)
     assert np.isfinite(result)
+
 
 def test_permanent_high_repetition():
     matrix = np.array([[2, 3], [4, 5]], dtype=np.complex128)
@@ -41,10 +46,12 @@ def test_permanent_high_repetition():
     result = perm(matrix, input, output)
     assert np.isfinite(result)
 
+
 def test_permanent_all_zeros_input_output():
     matrix = np.random.rand(4, 4) + 1j * np.random.rand(4, 4)
     input = output = np.zeros(4, dtype=np.uint64)
     assert np.isclose(perm(matrix, input, output), 1.0)
+
 
 def test_permanent_large_matrix_small_repetition():
     matrix = np.eye(8, dtype=np.complex128)
@@ -52,18 +59,21 @@ def test_permanent_large_matrix_small_repetition():
     result = perm(matrix, input, output)
     assert np.isclose(result, 1.0)
 
+
 def test_permanent_real_matrix():
     matrix = np.array([[1, 2], [3, 4]], dtype=np.float64)
     input = output = np.ones(2, dtype=np.uint64)
     with pytest.raises(Exception):
         perm(matrix, input, output)
 
+
 def test_permanent_complex_conjugate_symmetry():
-    matrix = np.array([[1+1j, 2-1j], [3+0j, 4+2j]], dtype=np.complex128)
+    matrix = np.array([[1 + 1j, 2 - 1j], [3 + 0j, 4 + 2j]], dtype=np.complex128)
     input = output = np.ones(2, dtype=np.uint64)
     result = perm(matrix, input, output)
     result_conj = perm(np.conj(matrix), input, output)
     assert np.isclose(result_conj, np.conj(result))
+
 
 def test_permanent_trivial_case():
     matrix = np.array([[4.2]], dtype=np.complex128)
@@ -89,7 +99,8 @@ def test_permanent_zero_input():
                 -0.45222962 - 0.75121057j,
                 0.06995606 - 0.3540245j,
             ],
-        ], dtype=np.complex128
+        ],
+        dtype=np.complex128,
     )
 
     input = output = np.zeros(3, dtype=np.uint64)
@@ -148,7 +159,8 @@ def test_permanent_no_repetition():
                 0.28736069 - 0.00798998j,
                 -0.13763068 - 0.09058005j,
             ],
-        ], dtype=np.complex128
+        ],
+        dtype=np.complex128,
     )
 
     input = output = np.ones(6, dtype=np.uint64)
@@ -194,7 +206,7 @@ def test_permanent_4_by_4():
                 -0.78447544 + 0.11350836j,
             ],
         ],
-        dtype=np.complex128
+        dtype=np.complex128,
     )
 
     rows = np.array([3, 0, 0, 1], dtype=np.uint64)
@@ -258,7 +270,7 @@ def test_permanent_6_by_6():
                 -0.06188047 + 0.14647274j,
             ],
         ],
-        dtype=np.complex128
+        dtype=np.complex128,
     )
 
     output = np.array([2, 1, 3, 0, 1, 2], dtype=np.uint64)
@@ -285,6 +297,9 @@ def test_permanent_asymmetric_matrix():
 
     assert np.isclose(
         perm(unitary, rows, cols),
-        perm(assym_reduce(unitary, rows.astype(dtype=int),
-             cols.astype(dtype=int)), ones, ones),
+        perm(
+            assym_reduce(unitary, rows.astype(dtype=int), cols.astype(dtype=int)),
+            ones,
+            ones,
+        ),
     )

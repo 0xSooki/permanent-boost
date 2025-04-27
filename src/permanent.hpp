@@ -31,7 +31,7 @@ using int_type = int64_t; // Fallback to int64_t
  * @param cols A vector representing the multiplicity of each column.
  * @return The permanent of the input matrix.
  */
-template <typename scalar_type, typename precision_type>
+template <typename T, typename precision_type>
 std::complex<double> permanent(Matrix<std::complex<double>> &A,
                                std::vector<int> &rows, std::vector<int> &cols)
 {
@@ -60,7 +60,7 @@ std::complex<double> permanent(Matrix<std::complex<double>> &A,
     }
     rows_[1 + min_idx] -= 1;
 
-    Matrix<scalar_type> mtx_(A.rows + 1, A.cols);
+    Matrix<T> mtx_(A.rows + 1, A.cols);
 
     for (int j = 0; j < A.cols; j++)
     {
@@ -84,8 +84,7 @@ std::complex<double> permanent(Matrix<std::complex<double>> &A,
 
   if (sum_rows != sum_cols)
   {
-    std::string error("BBFGPermanentCalculatorRepeated_Tasks::calculate:  "
-                      "Number of input and output states should be equal");
+    std::string error("Number of input and output states should be equal");
     throw error;
   }
 
@@ -95,12 +94,12 @@ std::complex<double> permanent(Matrix<std::complex<double>> &A,
 
   if (A.rows == 1)
   {
-    scalar_type ret(1.0, 0.0);
-    for (size_t idx = 0; idx < cols.size(); idx++)
+    T ret(1.0, 0.0);
+    for (size_t i = 0; i < cols.size(); i++)
     {
-      for (size_t jdx = 0; jdx < cols[idx]; jdx++)
+      for (size_t j = 0; j < cols[i]; j++)
       {
-        ret *= A[idx];
+        ret *= A[i];
       }
     }
 
@@ -108,31 +107,31 @@ std::complex<double> permanent(Matrix<std::complex<double>> &A,
   }
 
   Matrix<std::complex<double>> mtx2(A.rows, A.cols);
-  for (size_t idx = 0; idx < A.size(); idx++)
+  for (size_t i = 0; i < A.size(); i++)
   {
-    mtx2[idx] = A[idx] * 2.0;
+    mtx2[i] = A[i] * 2.0;
   }
 
   // Create a dynamically allocated array for n-ary limits.
   size_t n_ary_size = rows.size() - 1;
   int *n_ary_limits = new int[n_ary_size];
-  for (size_t idx = 0; idx < n_ary_size; idx++)
+  for (size_t i = 0; i < n_ary_size; i++)
   {
-    n_ary_limits[idx] = rows[idx + 1] + 1;
+    n_ary_limits[i] = rows[i + 1] + 1;
   }
 
   uint64_t idx_max = n_ary_limits[0];
-  for (size_t idx = 1; idx < n_ary_size; idx++)
+  for (size_t i = 1; i < n_ary_size; i++)
   {
-    idx_max *= n_ary_limits[idx];
+    idx_max *= n_ary_limits[i];
   }
 
   // determine the concurrency of the calculation
-  unsigned int nthreads = std::thread::hardware_concurrency();
-  int64_t concurrency = static_cast<int64_t>(nthreads) * 5;
+  unsigned int n_threads = std::thread::hardware_concurrency();
+  int64_t concurrency = static_cast<int64_t>(n_threads) * 4;
   concurrency = concurrency < idx_max ? concurrency : static_cast<int64_t>(idx_max);
 
-  std::vector<scalar_type> thread_results(concurrency, scalar_type(0.0, 0.0));
+  std::vector<T> thread_results(concurrency, T(0.0, 0.0));
 
 #pragma omp parallel for num_threads(concurrency)
   for (int64_t job_idx = 0; job_idx < concurrency; job_idx++)
@@ -156,23 +155,23 @@ std::complex<double> permanent(Matrix<std::complex<double>> &A,
     // calculate the initial column sum and binomial coefficient
     int_type binomial_coeff = 1;
 
-    Matrix<scalar_type> colsum(1, cols.size());
+    Matrix<T> colsum(1, cols.size());
     std::uninitialized_copy_n(A.data, colsum.size(), colsum.data);
     auto mtx_data = A.data + A.stride;
 
     // variable to count all the -1 elements in the delta vector
     int minus_signs_all = 0;
 
-    for (size_t idx = 0; idx < n_ary_size; idx++)
+    for (size_t i = 0; i < n_ary_size; i++)
     {
       // the value of the element of the gray code stands for the number of
       // \delta_i=-1 elements in the subset of multiplicated rows
-      const int &minus_signs = gcode[idx];
-      int row_mult_current = rows[idx + 1];
+      const int &minus_signs = gcode[i];
+      int row_mult_current = rows[i + 1];
 
       for (size_t col_idx = 0; col_idx < cols.size(); col_idx++)
       {
-        colsum[col_idx] += static_cast<scalar_type>(mtx_data[col_idx]) *
+        colsum[col_idx] += static_cast<T>(mtx_data[col_idx]) *
                            static_cast<precision_type>(row_mult_current - 2 * minus_signs);
       }
 
@@ -187,21 +186,21 @@ std::complex<double> permanent(Matrix<std::complex<double>> &A,
     // variable to refer to the parity of the delta vector (+1 if even, -1 if odd)
     char parity = (minus_signs_all % 2 == 0) ? 1 : -1;
 
-    scalar_type colsum_prod(static_cast<precision_type>(parity), static_cast<precision_type>(0.0));
-    for (size_t idx = 0; idx < cols.size(); idx++)
+    T colsum_prod(static_cast<precision_type>(parity), static_cast<precision_type>(0.0));
+    for (size_t i = 0; i < cols.size(); i++)
     {
-      for (size_t jdx = 0; jdx < cols[idx]; jdx++)
+      for (size_t j = 0; j < cols[i]; j++)
       {
-        colsum_prod *= colsum[idx];
+        colsum_prod *= colsum[i];
       }
     }
 
     // add the initial addend to the permanent - store in thread-local result
-    scalar_type &addend_loc = thread_results[job_idx];
+    T &addend_loc = thread_results[job_idx];
     addend_loc += colsum_prod * static_cast<precision_type>(binomial_coeff);
 
     // iterate over gray codes to calculate permanent addends
-    for (int64_t idx = initial_offset + 1; idx < offset_max + 1; idx++)
+    for (int64_t i = initial_offset + 1; i < offset_max + 1; i++)
     {
       int changed_index, prev_value, value;
       if (gcode_counter.next(changed_index, prev_value, value))
@@ -214,7 +213,7 @@ std::complex<double> permanent(Matrix<std::complex<double>> &A,
       // update column sum and calculate the product of the elements
       int row_offset = (changed_index + 1) * A.stride;
       auto mtx_data = mtx2.data + row_offset;
-      scalar_type colsum_prod(static_cast<precision_type>(parity), static_cast<precision_type>(0.0));
+      T colsum_prod(static_cast<precision_type>(parity), static_cast<precision_type>(0.0));
       for (size_t col_idx = 0; col_idx < cols.size(); col_idx++)
       {
         if (prev_value < value)
@@ -226,7 +225,7 @@ std::complex<double> permanent(Matrix<std::complex<double>> &A,
           colsum[col_idx] += mtx_data[col_idx];
         }
 
-        for (size_t jdx = 0; jdx < cols[col_idx]; jdx++)
+        for (size_t j = 0; j < cols[col_idx]; j++)
         {
           colsum_prod *= colsum[col_idx];
         }
@@ -242,11 +241,11 @@ std::complex<double> permanent(Matrix<std::complex<double>> &A,
     }
 
     for (size_t n = colsum.size(); n > 0; --n)
-      colsum[n - 1].~scalar_type();
+      colsum[n - 1].~T();
   }
 
-  // combine all thread results
-  scalar_type permanent(0.0, 0.0);
+  // Combine all thread results - we need a serial reduction
+  T permanent(0.0, 0.0);
   for (const auto &result : thread_results)
   {
     permanent += result;
@@ -268,14 +267,12 @@ Matrix<std::complex<double>> grad_perm(Matrix<std::complex<double>> &A,
 
   Matrix<std::complex<double>> perm_grad(n, n);
 
+#pragma omp parallel for collapse(2)
   for (int i = 0; i < n; ++i)
   {
-    if (rows[i] == 0)
-      continue;
-
     for (int j = 0; j < n; ++j)
     {
-      if (cols[j] == 0)
+      if (rows[i] == 0 || cols[j] == 0)
         continue;
 
       std::vector<int> grad_rows(rows);
