@@ -2,3 +2,5 @@ jax==0.5.0
 pybind11
 scikit-build-core
 tbb
+pytest
+numpy
