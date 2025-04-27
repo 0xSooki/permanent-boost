@@ -380,6 +380,13 @@ ffi::Error PermBwdImpl(cudaStream_t stream, ffi::Buffer<ffi::C128> res_grad,
     return ffi::Error::InvalidArgument("Matrix dimension mismatch with row/col vector sizes in PermBwdImpl.");
   }
 
+  if (n == 1)
+  {
+    cuDoubleComplex ma = make_cuDoubleComplex(1.0, 0.0);
+    cudaMemcpy(ct_x->typed_data(), &ma, sizeof(cuDoubleComplex), cudaMemcpyDeviceToDevice);
+    return ffi::Error::Success();
+  }
+
   std::vector<uint64_t> h_rows(n);
   cudaError_t cuda_err = cudaMemcpy(h_rows.data(), rows.typed_data(), n * sizeof(uint64_t), cudaMemcpyDeviceToHost);
   if (cuda_err != cudaSuccess)
