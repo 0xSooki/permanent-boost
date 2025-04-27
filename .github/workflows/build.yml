@@ -41,6 +41,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install uv
+        if: runner.os == 'macOS' || runner.os == 'Windows'
         run: python -m pip install uv
 
       - name: Install cibuildwheel
@@ -48,13 +49,13 @@ jobs:
 
       - name: Pre-install JAX for CMake header detection (macOS only)
         if: runner.os == 'macOS'
-        run: python -m pip install "jax>=0.4.29"
+        run: python -m pip install --upgrade --force-reinstall "jax==0.4.29"
 
       - name: Build wheels
         run: python -m cibuildwheel --output-dir wheelhouse
         env:
           CIBW_BUILD: "cp310-* cp311-* cp312-*"
-          MACOSX_DEPLOYMENT_TARGET: ${{ matrix.os == 'macos-14' && '14.0' || '11.0' }}
+          MACOSX_DEPLOYMENT_TARGET: ${{ matrix.os == 'macos-14' && '14.0' || '13.0' }}
           CIBW_ARCHS_WINDOWS: "AMD64"
       - name: Upload wheels as artifact
         uses: actions/upload-artifact@v4
