@@ -1,5 +1,4 @@
 #include "matrix.hpp"
-#include "numpy_utils.hpp"
 #include "permanent.hpp"
 #include "xla/ffi/api/c_api.h"
 #include "xla/ffi/api/ffi.h"
@@ -15,21 +14,6 @@
 
 namespace py = pybind11;
 namespace ffi = xla::ffi;
-
-template <typename T>
-T permanent_np(py::array_t<T, py::array::c_style | py::array::forcecast> array,
-               py::array_t<int> rows, py::array_t<int> cols)
-{
-  Matrix<T> matrix = numpy_to_matrix(array);
-
-  std::vector<int> row_mult = numpy_to_vec(rows);
-  std::vector<int> col_mult = numpy_to_vec(cols);
-
-  T result =
-      permanent<std::complex<double>, double>(matrix, row_mult, col_mult);
-
-  return result;
-}
 
 template <ffi::DataType T>
 std::pair<int64_t, int64_t> get_dims(const ffi::Buffer<T> &buffer)
@@ -174,9 +158,6 @@ PYBIND11_MODULE(_core, m)
 
            permanent
     )pbdoc";
-  m.def("permanent", &permanent_np<std::complex<double>>, R"pbdoc(
-        Compute the permanent of a matrix with specified row and column multiplicities.
-    )pbdoc");
   m.def("registrations", []()
         {
     py::dict registrations;

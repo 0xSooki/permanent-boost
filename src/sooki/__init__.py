@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ._core import __doc__, __version__, permanent, registrations
+from ._core import __doc__, __version__, registrations
 
 try:
     from sooki import gpu_ops
