@@ -157,7 +157,6 @@ std::complex<double> permanent(Matrix<std::complex<double>> &A,
 
     Matrix<T> colsum(1, cols.size());
     std::uninitialized_copy_n(A.data, colsum.size(), colsum.data);
-    auto mtx_data = A.data + A.stride;
 
     // variable to count all the -1 elements in the delta vector
     int minus_signs_all = 0;
@@ -169,18 +168,16 @@ std::complex<double> permanent(Matrix<std::complex<double>> &A,
       const int &minus_signs = gcode[i];
       int row_mult_current = rows[i + 1];
 
-      for (size_t col_idx = 0; col_idx < cols.size(); col_idx++)
+      for (size_t j = 0; j < cols.size(); j++)
       {
-        colsum[col_idx] += static_cast<T>(mtx_data[col_idx]) *
-                           static_cast<precision_type>(row_mult_current - 2 * minus_signs);
+        colsum[j] += static_cast<T>(A(i + 1, j)) *
+                     static_cast<precision_type>(row_mult_current - 2 * minus_signs);
       }
 
       minus_signs_all += minus_signs;
 
       // update the binomial coefficient
       binomial_coeff *= binomialCoeffInt128(row_mult_current, minus_signs);
-
-      mtx_data += A.stride;
     }
 
     // variable to refer to the parity of the delta vector (+1 if even, -1 if odd)
@@ -211,23 +208,15 @@ std::complex<double> permanent(Matrix<std::complex<double>> &A,
       parity = -parity;
 
       // update column sum and calculate the product of the elements
-      int row_offset = (changed_index + 1) * A.stride;
-      auto mtx_data = mtx2.data + row_offset;
+      int row_offset = changed_index + 1;
       T colsum_prod(static_cast<precision_type>(parity), static_cast<precision_type>(0.0));
-      for (size_t col_idx = 0; col_idx < cols.size(); col_idx++)
+      for (size_t j = 0; j < cols.size(); j++)
       {
-        if (prev_value < value)
+        colsum[j] += mtx2(row_offset, j) *
+                     static_cast<precision_type>(value - prev_value);
+        for (size_t k = 0; k < cols[j]; k++)
         {
-          colsum[col_idx] -= mtx_data[col_idx];
-        }
-        else
-        {
-          colsum[col_idx] += mtx_data[col_idx];
-        }
-
-        for (size_t j = 0; j < cols[col_idx]; j++)
-        {
-          colsum_prod *= colsum[col_idx];
+          colsum_prod *= colsum[j];
         }
       }
 
@@ -239,19 +228,14 @@ std::complex<double> permanent(Matrix<std::complex<double>> &A,
 
       addend_loc += colsum_prod * static_cast<precision_type>(binomial_coeff);
     }
-
-    for (size_t n = colsum.size(); n > 0; --n)
-      colsum[n - 1].~T();
   }
 
-  // Combine all thread results - we need a serial reduction
   T permanent(0.0, 0.0);
   for (const auto &result : thread_results)
   {
     permanent += result;
   }
 
-  // scaling factor
   permanent /= static_cast<precision_type>(ldexp(1.0, sum(rows) - 1));
 
   delete[] n_ary_limits;
