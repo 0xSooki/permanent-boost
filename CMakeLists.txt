@@ -6,16 +6,14 @@ project(${SKBUILD_PROJECT_NAME}
   VERSION ${SKBUILD_PROJECT_VERSION}
   LANGUAGES CXX)
 
-# Check for CUDA and conditionally enable the language
-include(CheckLanguage)
-check_language(CUDA)
-if(CMAKE_CUDA_COMPILER)
+find_package(CUDAToolkit)
+if(CUDAToolkit_FOUND)
   enable_language(CUDA)
   set(USE_CUDA ON)
   message(STATUS "CUDA enabled")
-  set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -O3")
 else()
-  message(STATUS "Building without CUDA")
+  set(USE_CUDA OFF)
+  message(STATUS "CUDA not found, building without CUDA support")
 endif()
 
 # Find Python, pybind11, and TBB
@@ -73,8 +71,6 @@ else()
     message(WARNING "OpenMP not found. Code will run in serial mode.")
 endif()
 
-set(CMAKE_CXX_FLAGS "-O2")
-target_compile_options(_core PRIVATE -O2)
 
 # #Install the module to the desired output directory
 install(TARGETS _core DESTINATION sooki)
@@ -88,10 +84,5 @@ if(USE_CUDA)
     ${CMAKE_CURRENT_LIST_DIR}/src/kernels.cc.cu
     ${CMAKE_CURRENT_LIST_DIR}/src/gpu_ops.cc)
   target_include_directories(gpu_ops PRIVATE ${XLA_DIR})
-  set_target_properties(gpu_ops PROPERTIES CUDA_SEPARABLE_COMPILATION ON) 
-  set_target_properties(gpu_ops PROPERTIES INTERPROCEDURAL_OPTIMIZATION OFF)
-  target_link_libraries(gpu_ops PRIVATE ${CUDA_DEVRT_LIBRARY})  # Add optimization flags to GPU module as well
-  target_compile_options(gpu_ops PRIVATE -O2)
-
   install(TARGETS gpu_ops DESTINATION sooki)
 endif()
