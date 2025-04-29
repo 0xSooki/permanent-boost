@@ -213,7 +213,7 @@ std::complex<double> permanent(Matrix<std::complex<double>> &A,
       for (size_t j = 0; j < cols.size(); j++)
       {
         colsum[j] += mtx2(row_offset, j) *
-                     static_cast<precision_type>(value - prev_value);
+                     static_cast<precision_type>(prev_value - value);
         for (size_t k = 0; k < cols[j]; k++)
         {
           colsum_prod *= colsum[j];
