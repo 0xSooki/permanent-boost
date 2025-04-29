@@ -41,10 +41,10 @@ std::pair<int64_t, int64_t> get_dims(const ffi::Buffer<T> &buffer)
   return std::make_pair(buffer.element_count(), dims.back());
 }
 
-__global__ void PermanentKernelMatrix(Matrix<cuDoubleComplex> A, uint64_t *rows, size_t rows_size,
-                                      uint64_t *cols, size_t cols_size,
-                                      int *h_n_ary_limits, size_t n_ary_size, uint64_t idx_max,
-                                      int64_t host_max_concurrent_warps, int sum_rows, cuDoubleComplex *result)
+__global__ void PermanentKernel(Matrix<cuDoubleComplex> A, uint64_t *rows, size_t rows_size,
+                                uint64_t *cols, size_t cols_size,
+                                int *h_n_ary_limits, size_t n_ary_size, uint64_t idx_max,
+                                int64_t host_max_concurrent_warps, int sum_rows, cuDoubleComplex *result)
 {
   size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
   size_t stride = blockDim.x * gridDim.x;
@@ -109,7 +109,7 @@ __global__ void PermanentKernelMatrix(Matrix<cuDoubleComplex> A, uint64_t *rows,
 
     local_result = cuCadd(local_result, colsum_prod);
 
-    for (int64_t idx = initial_offset + 1; idx < offset_max + 1; idx++)
+    for (int64_t i = initial_offset + 1; i < offset_max + 1; i++)
     {
       int changed_index, prev_value, value;
       if (gcode_counter.next(changed_index, prev_value, value))
@@ -121,20 +121,12 @@ __global__ void PermanentKernelMatrix(Matrix<cuDoubleComplex> A, uint64_t *rows,
 
       int row_offset = changed_index + 1;
       cuDoubleComplex colsum_prod = make_cuDoubleComplex(parity, 0.0);
-      for (size_t col_idx = 0; col_idx < cols_size; col_idx++)
+      for (size_t j = 0; j < cols_size; j++)
       {
-        if (prev_value < value)
+        colsum[j] = cuCadd(colsum[j], cuCmul(make_cuDoubleComplex((prev_value - value) * 2.0, 0.0), A(row_offset, j)));
+        for (size_t k = 0; k < cols[j]; k++)
         {
-          colsum[col_idx] = cuCsub(colsum[col_idx], cuCmul(make_cuDoubleComplex(2.0, 0.0), A(row_offset, col_idx)));
-        }
-        else
-        {
-          colsum[col_idx] = cuCadd(colsum[col_idx], cuCmul(make_cuDoubleComplex(2.0, 0.0), A(row_offset, col_idx)));
-        }
-
-        for (size_t jdx = 0; jdx < cols[col_idx]; jdx++)
-        {
-          colsum_prod = cuCmul(colsum_prod, colsum[col_idx]);
+          colsum_prod = cuCmul(colsum_prod, colsum[j]);
         }
       }
 
@@ -295,14 +287,14 @@ cudaError_t calculatePermanent(cudaStream_t stream,
 
     const int block_dim = 256;
     int max_blocks_per_sm;
-    cudaOccupancyMaxActiveBlocksPerMultiprocessor(&max_blocks_per_sm, PermanentKernelMatrix, block_dim, 0);
+    cudaOccupancyMaxActiveBlocksPerMultiprocessor(&max_blocks_per_sm, PermanentKernel, block_dim, 0);
     int max_concurrent_blocks_gpu = props.multiProcessorCount * max_blocks_per_sm;
     int min_blocks_for_work = (idx_max == 0) ? 0 : (int)((idx_max + block_dim - 1) / block_dim);
     const int grid_dim = std::min(max_concurrent_blocks_gpu, min_blocks_for_work);
 
     if (grid_dim > 0)
     {
-      PermanentKernelMatrix<<<grid_dim, block_dim, 0, stream>>>(
+      PermanentKernel<<<grid_dim, block_dim, 0, stream>>>(
           modified_m, d_new_rows, new_rows_size,
           cols_data, cols_size,
           d_n_ary_limits, n_ary_size, idx_max,
