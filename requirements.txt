@@ -3,3 +3,6 @@ pybind11
 scikit-build-core
 pytest
 numpy
+scipy
+PyQt5
+pandas
