@@ -126,6 +126,12 @@ std::complex<double> permanent(Matrix<std::complex<double>> &A,
     idx_max *= n_ary_limits[i];
   }
 
+  const uint64_t MAX_IDX_MAX = 100000000;
+  if (idx_max > MAX_IDX_MAX)
+  {
+    throw std::runtime_error("Problem too large: idx_max exceeds safe limit.");
+  }
+
   // determine the concurrency of the calculation
   unsigned int n_threads = std::thread::hardware_concurrency();
   int64_t concurrency = static_cast<int64_t>(n_threads) * 4;

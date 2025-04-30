@@ -268,6 +268,15 @@ cudaError_t calculatePermanent(cudaStream_t stream,
       idx_max *= h_n_ary_limits[i];
     }
 
+    const uint64_t MAX_IDX_MAX = 100000000;
+    if (idx_max > MAX_IDX_MAX)
+    {
+      cudaFree(d_new_matrix);
+      cudaFree(d_new_rows);
+      cudaFree(d_n_ary_limits);
+      throw std::runtime_error("Problem too large: idx_max exceeds safe limit.");
+    }
+
     cuda_err = cudaMalloc(&d_n_ary_limits, n_ary_size * sizeof(int));
     if (cuda_err != cudaSuccess)
     {
