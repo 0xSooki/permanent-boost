@@ -194,6 +194,7 @@ class PermanentCalculatorUI(QMainWindow):
 
                 self.calculate_button.setEnabled(True)
                 self.gradient_data = None
+                self.validate_multiplicities()
 
             except Exception as e:
                 self.status_label.setText(f"Error importing file: {str(e)}")
@@ -264,12 +265,17 @@ class PermanentCalculatorUI(QMainWindow):
         self.status_label.setText("Import a file to calculate the permanent")
         self.statusBar.showMessage("Ready")
         self.calculate_button.setEnabled(False)
+        self.rows_edit.clear()
+        self.cols_edit.clear()
 
     def update_rows_from_edit(self):
         text = self.rows_edit.text()
         try:
             values = [int(x.strip()) for x in text.split(",") if x.strip() != ""]
-            if len(values) != self.matrix_data.shape[0]:
+            if (
+                self.matrix_data is not None
+                and len(values) != self.matrix_data.shape[0]
+            ):
                 raise ValueError("Number of rows values does not match matrix size.")
             self.rows = np.array(values, dtype=np.uint64)
             matrix_str = (
@@ -278,14 +284,19 @@ class PermanentCalculatorUI(QMainWindow):
             rows_str = f"Rows: {self.rows}"
             cols_str = f"Cols: {self.cols}"
             self.matrix_display.setText(f"{matrix_str}\n\n{rows_str}\n{cols_str}")
+            self.validate_multiplicities()
         except Exception as e:
             self.statusBar.showMessage(f"Invalid rows input: {e}")
+            self.calculate_button.setEnabled(False)
 
     def update_cols_from_edit(self):
         text = self.cols_edit.text()
         try:
             values = [int(x.strip()) for x in text.split(",") if x.strip() != ""]
-            if len(values) != self.matrix_data.shape[1]:
+            if (
+                self.matrix_data is not None
+                and len(values) != self.matrix_data.shape[1]
+            ):
                 raise ValueError("Number of cols values does not match matrix size.")
             self.cols = np.array(values, dtype=np.uint64)
             matrix_str = (
@@ -294,8 +305,32 @@ class PermanentCalculatorUI(QMainWindow):
             rows_str = f"Rows: {self.rows}"
             cols_str = f"Cols: {self.cols}"
             self.matrix_display.setText(f"{matrix_str}\n\n{rows_str}\n{cols_str}")
+            self.validate_multiplicities()
         except Exception as e:
             self.statusBar.showMessage(f"Invalid cols input: {e}")
+            self.calculate_button.setEnabled(False)
+
+    def validate_multiplicities(self):
+        if self.matrix_data is None or self.rows is None or self.cols is None:
+            self.calculate_button.setEnabled(False)
+            return
+        if (
+            len(self.rows) != self.matrix_data.shape[0]
+            or len(self.cols) != self.matrix_data.shape[1]
+        ):
+            self.statusBar.showMessage(
+                "Row/col vector length does not match matrix shape."
+            )
+            self.calculate_button.setEnabled(False)
+            return
+        if self.rows.sum() != self.cols.sum():
+            self.statusBar.showMessage(
+                f"Sum of rows ({self.rows.sum()}) does not match sum of cols ({self.cols.sum()})"
+            )
+            self.calculate_button.setEnabled(False)
+            return
+        self.calculate_button.setEnabled(True)
+        self.statusBar.showMessage("Ready")
 
 
 if __name__ == "__main__":
