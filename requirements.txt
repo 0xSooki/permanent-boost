@@ -6,3 +6,4 @@ numpy
 scipy
 PyQt5
 pandas
+piquasso
