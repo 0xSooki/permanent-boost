@@ -1,10 +1,8 @@
+[![PyPI version](https://img.shields.io/pypi/v/permanentboost)](https://pypi.org/project/permanentboost/)  [![Build](https://github.com/0xSooki/permanent-boost/actions/workflows/tests.yml/badge.svg)](https://github.com/0xSooki/permanent-boost/actions)  [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 # Permanent Boost
 
 Efficient, parallelized computation of the matrix permanent and its gradient for photonic quantum computing simulations, supporting both CPU and GPU execution.
-
-[![PyPI version](https://img.shields.io/pypi/v/permanentboost)](https://pypi.org/project/permanentboost/)  
-[![Build](https://github.com/0xSooki/permanent-boost/actions/workflows/tests.yml/badge.svg)](https://github.com/0xSooki/permanent-boost/actions)  
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ## Overview
 
