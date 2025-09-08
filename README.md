@@ -16,7 +16,6 @@ It is implemented in C++/CUDA and exposed via Python using `pybind11` and XLA FF
 - 🔁 Gradient support for use in QML
 - ⚡ CPU & GPU acceleration
 - 🧪 Comprehensive test suite
-- 🧩 PyQt5 GUI included for demonstration
 - 📦 Easy installation via pip
 - 🔄 JAX-compatible bindings for auto-diff workflows
 
